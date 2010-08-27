@@ -1,8 +1,8 @@
 #! /usr/bin/perl
-use Confer ;
+use Loggator::Confer ;
 use Data::Dumper;
 
-my $conf = Confer->new('log.d');
+my $conf = Loggator::Confer->new('log.d');
 $conf->process();
 
 print Dumper $conf;

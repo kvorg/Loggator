@@ -7,21 +7,27 @@
 # -fix tag infrastructure for nested tags (optimisation??)
 # -add cmdline (ie. notags)
 
+# THINKOS:
+# add sticky values (that are added from previous log lines until superceeded by new ones)
+# example: gridftpd log ID numbers.
+
 use strict; use warnings;
 
-use Confer ;
-use Parser ;
+use Loggator::Confer ;
+use Loggator::Parser ;
 use Data::Dumper ;
 
-my $conf = Confer->new('log.d');
+my $conf = Loggator::Confer->new('log.d');
 $conf->process();
+
+print "Configuration processing finished.\n\n";
 
 LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
   if ( open my $log, "<", $conf->{confs}{$logconf}[0]{logfile} )    {
 
     print "Parsing [$logconf]: $conf->{confs}{$logconf}[0]{logfile} ...\n";
 
-    my $parser = Parser->new( $conf->{confs}{$logconf}[0]{patterns}, $conf->{confs}{$logconf}[0]{tags} );
+    my $parser = Loggator::Parser->new( $conf->{confs}{$logconf}[0]{patterns} );
     my $matches = 0;
     my $fails = 0;
     my %tags = ();

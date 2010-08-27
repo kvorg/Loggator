@@ -1,4 +1,9 @@
-package Confer;
+# TODO:
+# differentiate log and dbase confs
+# implement store/publish/join thingies in log conf, using dbase conf references
+# implement handles: calling external scripts with several types of data arguments
+#                    either on parse objects or join-data objects
+package Loggator::Confer;
 
 use YAML qw( LoadFile) ;
 use File::Find;
