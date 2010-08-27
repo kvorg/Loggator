@@ -1,0 +1,54 @@
+- logfile: /afs/f9.ijs.si/home/jona/Projects/NG-logmonitor/var/gm-jobs.log
+  patterns:
+    - standard:
+        - date: '(\d{2}-\d{2}-\d{4}) \s+'
+        - time: '(\d{2}:\d{2}:\d{2}) \s+'
+        - type: (Started|Finished) \s+ -
+        - jobid: '\s+ job \s id: \s+ (\d+)'
+        - unixuser: ', \s+ unix \s user: \s+ (\d+:\d+)'
+        - _jobopen: '(:? ()'
+        - jobname: ', \s+ name: \s+ "([^"]*)"'
+        - ownerDN: ',\s+ owner: \s+ "([^"]*)"'
+        - lrmstype: ',\s+ lrms: \s+ ([^,]*)'
+        - queuename: '(:? , \s+ queue: \s+ ([^,]*) '
+        - lrmsid: ')?(:? ,\s lrmsid: \s+ (\d+\.\w+) '
+        - _jobclose: )?() )?
+        - failure: '(:? (:? (:? ,\s+)? ,\s* failure: \s+ \"(.*)\" \s* $ '
+        - _close: ')? | (?:\s*$ ) ) () '
+  tags:
+    atlas_kitvalidation:
+      jobname: 'KitValidation-'
+    atlas_production:
+      jobname: '\.v\d+(:?_tid\d+)?\._\d+\.job'
+    atlas_production:
+      jobname: 
+    atlas_kitvalidation:
+      jobname: 'KitValidation-'
+    started:
+      type: 'Started'
+    finished:
+      type: 'Finished'
+    failed:
+      failure: '.'
+    dryrun:
+      failure: 'User requested dryrun'
+    cancel:
+      failure: 'User requested to cancel the job'
+    failed-download:
+      failure: 'Failed in files download \(pre-processing\)'
+    failed-upload:
+      failure: 'Failed in files upload \(post-processing\)'
+    failed-auth:
+      failure: 'incorrect password attemp'
+    failed-PBSkill:
+      failure: 'Job was killed by PBS'
+    failed-LRMS-submit:
+      failure: 'Job submission to LRMS failed'
+    failed-LRMS-error:
+      failure: 'LRMS error(?!.*Job failed with exit code)'
+    failed-LRMS-jobfailed:
+      failure: 'LRMS error.*Job failed with exit code'
+    failed-jobexit:
+      failure: 'Job exit code'
+    failed-joblost:
+      failure: 'Failed reading status of the job'

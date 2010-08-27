@@ -1,3 +1,54 @@
+package Parser;
+
+use strict; use warnings;
+use re 'eval';
+
+sub new {
+  my $this = shift;
+  my $class = ref($this) || $this;
+  my $self = {};
+  bless $self, $class;
+
+  $self->init(@_);
+
+  return $self;
+}
+
+sub init {
+  my $self = shift;
+  $self->{patterns} = shift ;
+  $self->{res} = [] ;
+  $self->{re} = {} ;
+
+  foreach (@{$self->{patterns}})
+    {
+      my ( $pname ) = keys %{$_};
+      push @{$self->{res}}, $pname;  # save pattern order
+      $self->{re}{$pname} = join "\n",
+	map
+	  {
+	    my ($a) = keys %$_;
+	    $_->{$a} . ($a =~ m/^_/ ? '' : ' (?{ $self->{results}{' . $a . '}=$^N })');
+	  } @{$_->{$pname}};
+    }
+}
+
+sub parse {
+  my $self = shift;
+  my $line = shift;
+
+  $self->{results} = {} ;
+  my $status;
+
+  $status = 1 if (m/$self->{re}{$self->{res}[0]}/x) ; #matches fist pattern:
+                                                              #FIX to support many pttrns
+  return ($self->{results}, $status);
+}
+
+1;
+__END__
+
+
 #! /usr/bin/perl -w  # -*- cperl -*-
 
 # see brenta cgi-bin for panda job links!!
@@ -27,6 +78,7 @@
 
 
 use strict;
+use re 'eval';
 
 #$_ = ' 21-06-2006 10:29:11 Finished - job id: 2613111508408701911166997, unix user: 4102:4100, name: "", owner: "", lrms: , queue: , failure: "Failed reading status of the job."';
 #m[(\d{2}-\d{2}-\d{4}) (:? Started | Finished ) \s+ - \s+ job \s id: \s \d+ ,\s+ unix \s user: \s \d+:\d+ , \s+  name: \s "[^"]*" .*]x );
@@ -50,34 +102,140 @@ use strict;
 
 $_ = ' 21-06-2006 10:29:11 Finished - job id: 2613111508408701911166997, unix user: 4102:4100, name: "", owner: "", lrms: , queue: , failure: "Failed reading status of the job."';
 $_= ' 04-02-2006 10:35:03 Started - job id: 1261611390492381360303405, unix user: 4102:4100, name: "mc11.005310.PythiaH120gamgam.recon.v11000308._00011.job", owner: "/O=Grid/O=NorduGrid/OU=fys.uio.no/CN=Alex Read", lrms: pbs, queue: gridlong';
-
-my @pattern = (
-	       { date =>      '(\d{2}-\d{2}-\d{4}) \s+' },
-	       { time =>      '(\d{2}:\d{2}:\d{2}) \s+' },
-	       { type =>      '(Started|Finished) \s+ -' },
-	       { jobid =>     '\s+ job \s id: \s+ (\d+)'},
-	       { unixuser =>  ', \s+ unix \s user: \s+ (\d+:\d+)'},
-	       { jobname  =>  ', \s+ name: \s+ "([^"]*)"'},       #open
-	       { ownerDN =>   ',\s+ owner: \s+ "([^"]*)"'},
-	       { lrmstype =>  ',\s+ lrms: \s+ ([^,]*)'},
-	       { queuename => '(:? ,\s+ queue: \s+ ([^,]*) )?'},
-	       { lrmsid =>  '(:? ,\s lrmsid: \s+ (\d+\.\w+)  )?  '}, #close
-);
-
-my $re = join ' ', map { my ($a) = keys %$_; $_->{$a}; } @pattern;
-my @catch = map { my ($a) = keys %$_; $a; } @pattern;
+$_ = ' 04-02-2006 10:35:03 Started - job id: 128361139049283226935834, unix user: 4102:4100, name: "mc11.005310.PythiaH120gamgam.recon.v11000308._00013.job", owner: "/O=Grid/O=NorduGrid/OU=fys.uio.no/CN=Alex Read", lrms: pbs, queue: gridlong, lrmsid: 512841.brenta';
 
 
-print $re, "\n";
-print join ', ', @catch, "\n";
-print "matched\n" if m/$re/x;
-my @results = m/$re/x;
-print (( join "\n", @results), "\n");
-my %results = ();
-for (@catch) 
-  {
-    $results{$_} = shift @results;
+my $setup =
+  [
+   { logfile => '/afs/f9.ijs.si/home/jona/Projects/NG-logmonitor/log.d/var/gm-jobs.log',
+     patterns =>
+     [
+      { standard =>
+       [
+	{ date =>      '(\d{2}-\d{2}-\d{4}) \s+' },
+	{ time =>      '(\d{2}:\d{2}:\d{2}) \s+' },
+	{ type =>      '(Started|Finished) \s+ -' },
+	{ jobid =>     '\s+ job \s id: \s+ (\d+)'},
+	{ unixuser =>  ', \s+ unix \s user: \s+ (\d+:\d+)'},
+	{ _jobopen  => '(:? ()' },                          #open
+	{ jobname  =>  ', \s+ name: \s+ "([^"]*)"'},
+        { ownerDN =>   ',\s+ owner: \s+ "([^"]*)"'},
+	{ lrmstype =>  ',\s+ lrms: \s+ ([^,]*)'},
+	{ queuename => '(:? , \s+ queue: \s+ ([^,]*) '},
+	{ lrmsid =>    ')?(:? ,\s lrmsid: \s+ (\d+\.\w+) '},
+	{ _jobclose => ')?() )?'},                          #close
+#	{ failure =>   '(:? (:? ,\s+)? ,\s* failure: \s+ ( (?:(?:\")(?:[^\\\"]*(?:\\.[^\\\"]*)*)(?:\")) ) ' },
+#	{ _close =>  ')? () \s*$'},                          #lineend
+	{ failure =>   '(:? (:? (:? ,\s+)? ,\s* failure: \s+ \"(.*)\" \s* $ ' },
+	{ _close =>  ')? | (?:\s*$ ) ) () '},                          #lineend
+
+       ],
+      },
+     ],
+   }
+  ];
+
+
+my %logs;
+
+LOG: foreach my $setup (@$setup) {
+  if (open my $log, "<", $setup->{logfile})
+    {
+        $logs{$setup->{logfile}} = { loghandle => $log, #FIXME - while running
+				     logfile   => $setup->{logfile},
+				     logname   => $setup->{logfile}, #FIXME
+				     re        => {},
+				     res       => [],
+				   };
+    }
+  else
+    {
+      warn "Can't read $setup->{logfile}, aborting logfile ($!)\n";
+      next LOG;
+    }
+
+  foreach (@{$setup->{patterns}})
+    {
+      my ($pname ) = keys %{$_};
+      push @{$logs{$setup->{logfile}}{res}}, $pname;  # save pattern order
+      $logs{$setup->{logfile}}{re}{$pname} = join "\n",
+	map
+	  {
+	    my ($a) = keys %$_;
+	    $_->{$a} . ($a =~ m/^_/ ? '' : ' (?{ $results{' . $a . '}=$^N })');
+	  } @{$_->{$pname}};
+    }
+}
+use YAML;
+print Dump($setup, \%logs,);
+
+print "\nProcessing ...";
+
+my $matched = 0;
+my $missed = 0;
+my @results;
+
+my %results;
+
+foreach my $log (keys %logs) {
+  print " $logs{$log}{logname} ";
+#  while ( < $logs{$log}{loghandle} > ) {
+  while ( <> ) {
+    #$DB::single = 2;
+#    my %results;
+    %results = ();
+    if (m/$logs{$log}{re}{$logs{$log}{res}[0]}/x) #FIX to support many pttrns
+      {
+#	$DB::single = 2;
+	print '.';
+	$matched++;
+	print "\nMatched:\n$_\n"; #  if $results{failure};
+#	push @results, { %results };
+	print Dump (\%results); # if $results{failure};
+      }
+    else
+      {
+	print 'x';
+	$missed++;
+#	print "\nMissed:\n$_\n";
+      }
+    #print "Found failure: $results{failure}\n" if (defined $results{failure});
   }
+}
+
+print "\n ... done.\n";
+print " Missed $missed out of " . ($missed + $matched) . 
+  " (" . sprintf ("%4.2f", ( $missed / ($missed + $matched) * 100)) . " %)\n";
+
+print "Results: ", scalar @results, "\n";
+foreach (@results) {
+  print Dump $_;
+}
+
+__END__
+my %results= ();
+
+my $re = join "\n", map {
+  my ($a) = keys %$_;
+  $_->{$a} . ($a =~ m/^_/ ? '' : ' (?{ $results{' . $a . '}=$^N })');
+} @pattern;
+
+#debugging
+print $re, "\n";
+
+print "\n===\n";
+
+use YAML;
+print Dump(\@pattern);
+
+print "\n===\n";
+
+
+my @results = m/$re/x and print "matched\n";
+
+print (( join "\n", @results), "\n");
+
+print "\n===\n";
 
 while (my @result = each %results)
   {

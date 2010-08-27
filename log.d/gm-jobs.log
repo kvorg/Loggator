@@ -1,0 +1,17 @@
+- logfile: /afs/f9.ijs.si/home/jona/Projects/NG-logmonitor/var/gm-jobs.log
+  patterns:
+    - standard:
+        - date: '(\d{2}-\d{2}-\d{4}) \s+'
+        - time: '(\d{2}:\d{2}:\d{2}) \s+'
+        - type: (Started|Finished) \s+ -
+        - jobid: '\s+ job \s id: \s+ (\d+)'
+        - unixuser: ', \s+ unix \s user: \s+ (\d+:\d+)'
+        - _jobopen: '(:? ()'
+        - jobname: ', \s+ name: \s+ "([^"]*)"'
+        - ownerDN: ',\s+ owner: \s+ "([^"]*)"'
+        - lrmstype: ',\s+ lrms: \s+ ([^,]*)'
+        - queuename: '(:? , \s+ queue: \s+ ([^,]*) '
+        - lrmsid: ')?(:? ,\s lrmsid: \s+ (\d+\.\w+) '
+        - _jobclose: )?() )?
+        - failure: '(:? (:? (:? ,\s+)? ,\s* failure: \s+ \"(.*)\" \s* $ '
+        - _close: ')? | (?:\s*$ ) ) () '
