@@ -1,0 +1,4 @@
+PATH=/sbin:/bin:/usr/sbin:/usr/bin
+55 04 * * * root /opt/gmjobs-metrics-export/gmjobs-metrics-exporter-blahmode.sh
+
+

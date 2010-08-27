@@ -28,7 +28,7 @@ use DBI;
 
 #setup
 
-my $version = '0.3';
+my $version = '0.5';
 my $progname = $0; $progname =~ s{(.*/)?([^/]+)$}{$2} ;
 
 my $config = 'jobstat.rc' ;
@@ -42,7 +42,7 @@ my $withundo = 0;
 my $help = 0;
 
 my $hostname = 'xxx.ijs.si';
-my $port =     'xxx';
+my $port =     'xxxx';
 my $database = 'accounting';
 my $user =     'accounting';
 my $passwd =    'xxx';

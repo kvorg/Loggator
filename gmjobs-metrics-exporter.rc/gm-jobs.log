@@ -3,6 +3,7 @@
   patterns:
     - standard:
         re:
+          - _open: '^\0*\s*'
           - date: '(\d{2}-\d{2}-\d{4}) \s+'
           - time: '(\d{2}:\d{2}:\d{2}) \s+'
           - type: (Started|Finished) \s+ -

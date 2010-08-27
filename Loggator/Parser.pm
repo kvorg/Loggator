@@ -12,6 +12,8 @@ sub new {
   my $self = {};
   bless $self, $class;
 
+  $DB::single = 2;
+
   $self->init(@_);
 
   return $self;
@@ -39,13 +41,14 @@ sub init {
 
 
 sub buildre {
+    #$DB::single = 2;
+
     my $pttrn = shift;
     my $where = shift;
 
     my $re = join "\n", map {
 	my ($a) = keys %$_;
-	my $aname = $a; $aname =~ s/([^.]*)([.].+)/$1/ ; #omit types
-	$_->{$a} . ($a =~ m/^_/ ? '' : ' (?{ ' . $where . '{' . $aname . '}=$^N })');
+	$_->{$a} . ($a =~ m/^_/ ? '' : ' (?{ ' . $where . '{' . $a . '}=$^N })');
     } @$pttrn;
     return $re;
 }
