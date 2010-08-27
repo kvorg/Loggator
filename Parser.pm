@@ -1,7 +1,20 @@
 package Parser;
 
 use strict; use warnings;
-use re 'eval';
+use re qw (eval);
+use subs qw (testall);
+
+#non-methods
+sub testall (&@) {
+  my $test = shift;
+  my $status = 1;
+
+  foreach (@_) {
+    $status &&= &$test ;
+  }
+    return $status;
+}
+
 
 sub new {
   my $this = shift;
@@ -17,33 +30,49 @@ sub new {
 sub init {
   my $self = shift;
   $self->{patterns} = shift ;
+  $self->{tags} = shift ;
   $self->{res} = [] ;
   $self->{re} = {} ;
 
-  foreach (@{$self->{patterns}})
-    {
-      my ( $pname ) = keys %{$_};
-      push @{$self->{res}}, $pname;  # save pattern order
-      $self->{re}{$pname} = join "\n",
-	map
-	  {
-	    my ($a) = keys %$_;
-	    $_->{$a} . ($a =~ m/^_/ ? '' : ' (?{ $self->{results}{' . $a . '}=$^N })');
-	  } @{$_->{$pname}};
-    }
+  foreach (@{$self->{patterns}}) {
+    my ( $pname ) = keys %{$_};
+    push @{$self->{res}}, $pname;  # save pattern order
+    $self->{re}{$pname} = join "\n",
+      map {
+	my ($a) = keys %$_;
+	$_->{$a} . ($a =~ m/^_/ ? '' : ' (?{ $self->{results}{' . $a . '}=$^N })');
+      } @{$_->{$pname}};
+#    $self->{re}{$pname} = \qr($self->{re}{$pname}); #compile pttrns in advance
+  }
+
+#  foreach my $tag (keys %{$self->{tags}}) {
+#    foreach my $pattern ( keys %{$self->{tags}{$tag}} ) {
+#      $self->{tags}{$tag}{$pattern} = \qr($self->{tags}{$tag}{$pattern}); #compile pttrns
+#    }
+#  }
 }
 
 sub parse {
   my $self = shift;
   my $line = shift;
 
-  $self->{results} = {} ;
-  my $status;
+  $self->{results} = {} ; # used directly from mangled patterns, as set in init()
+  my $matched;
+  my $tags = [];
 
-  $status = 1 if (m/$self->{re}{$self->{res}[0]}/x) ; #matches fist pattern:
+  $matched = $self->{res}[0] if (m/$self->{re}{$self->{res}[0]}/x) ; #matches fist pattern:
                                                               #FIX to support many pttrns
-  return ($self->{results}, $status);
+  $DB::single = 2;
+  @$tags = grep {
+    my $tag = $_;
+    testall { exists $self->{results}{$_}
+		and $self->{results}{$_} =~ m{$self->{tags}{$tag}{$_}} ; }
+      keys %{$self->{tags}{$tag}} ;
+  } keys %{$self->{tags}} ;
+
+  return ($self->{results}, $matched, $tags);
 }
+
 
 1;
 __END__
