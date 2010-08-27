@@ -1,7 +1,9 @@
-#! /usr/bin/perl
+#! /usr/bin/perl -w
 
 # This is a quick hack using the loggator log parser in progress
 # to parse gmjobs.log and post results directly to lcgce's mysql.
+
+# To be replaced with a loggator export directive once loggator is ready.
 
 # It has a critical condition on time to be run from cron:
 # it MUST run between /etc/cron.d/edg-apel-pbs-parser and
@@ -26,13 +28,17 @@ use DBI;
 
 #setup
 
+my $version = '0.3';
+my $progname = $0; $progname =~ s{(.*/)?([^/]+)$}{$2} ;
+
 my $config = 'jobstat.rc' ;
 my $logfile = 'jobstat.log' ;
 my $statefile = 'jobstat.state' ;
-my $nocommit = 1;
+my $nocommit = 0;
 my $reparse= 0;
 my $verbose = 0;
 my $debug = 0;
+my $withundo = 0;
 my $help = 0;
 
 my $hostname = 'xxx.ijs.si';
@@ -41,18 +47,20 @@ my $database = 'accounting';
 my $user =     'accounting';
 my $passwd =    'xxx';
 
+Getopt::Long::Configure qw(no_ignore_case);
 GetOptions ( 'config|c=s'   => \$config,
 	     'logfile|l=s'  => \$logfile,
              'statefile|s=s'=> \$statefile,
-	     'nocommit|c'   => \$nocommit,
+	     'nocommit|n'   => \$nocommit,
 	     'reparse|r'    => \$reparse,
 	     'verbose|v'    => \$verbose,
 	     'debug|d'      => \$debug,
-	     'hostname|m=s' => \$hostname,
+	     'withundo|u=s' => \$withundo, 
+	     'hostname|H=s' => \$hostname,
 	     'port|p=i'     => \$port,
 	     'database|b=s' => \$database,
-	     'username|u=s' => \$user,
-	     'password|p=s' => \$passwd,
+	     'username|U=s' => \$user,
+	     'password|P=s' => \$passwd,   #FIXME: need use of backend conf file!
 	     'help|h'       => \$help,
 	   );
 
@@ -66,6 +74,8 @@ my $skipped = 0 ;
 my $posted = 0 ;
 my $startfrom ;
 my $dt ;
+my $undofile ;
+my $nocommitmsg = '';
 
 open our $log, ">>", $logfile
   or die "Can't open logfile $logfile, @!\n";
@@ -73,7 +83,7 @@ $| = 1, select $_ for select $log; #log to autoflush :-)
 open STATE, "<", $statefile
   or warn "Can't open state file $statefile for reading, @!\n" unless $reparse ;
 
-printlog ("Jobstat-parser starting.\n");
+printlog ("\u$progname v $version starting.\n");
 
 my $dbh = DBI->connect("DBI:mysql:database=$database;host=$hostname;port=$port",
  		       $user, $passwd,
@@ -84,18 +94,15 @@ my $dbh = DBI->connect("DBI:mysql:database=$database;host=$hostname;port=$port",
 printlog ("! MySQL hostname not set - dry run!\n") unless $hostname;
 warn "MySQL hostname not set - dry run!\n" unless $hostname;
 
-
-# my $sth = $dbh->prepare("SELECT ValidFrom, GramScriptJobID FROM GkRecords WHERE GramScriptJobID = LocalJobID ORDER BY ValidFrom DESC, GramScriptJobID ASC LIMIT 3;");
-# $sth->execute();
-# while (my $ref = $sth->fetchrow_hashref() ) {
-# #  or die "Strange - no nordugrid data in table?\n " . $dbh->errstr() . "\n";
-#   my $lastdate = $ref->{ValidFrom};
-#   my $lastid   = $ref->{GramScriptJobID};
-
-# print "Got $lastid on $lastdate.\n";
-# }
-
-#STUPID AND IMPOSSIBLE - we have to keep our own state over invocations
+if ($withundo) {
+    my $start = DateTime->now();
+    my $date = $start->ymd() ;
+    my $time = $start->hms() ;
+    $withundo =~ s{%d}{$date}g ;
+    $withundo =~ s{%t}{$time}g ;
+    open ($undofile, '>>', $withundo) or printlog ("Failed to open undo file $withundo: $!\n");
+    printlog ("Writing undo to $withundo.\n") if $undofile ;
+}
 
 
 # Configuration
@@ -103,12 +110,10 @@ my $conf = Loggator::Confer->new($config);
 $conf->setlog($log);
 $conf->process();
 
-printlog ("Configuration processing finished.\n");
+printlog ("Configuration processing of $config finished.\n");
 
 #my $storage = Loggator::Storage->new( $conf->{backends}, $conf->{confs}  );
 #$DB::single = 2;
-
-#open files or die
 
 my $rewind = 0;
 
@@ -128,7 +133,12 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
     if ($rewind and not $reparse) {
       seek($log, $rewind, 0);
       printlog ("Rewinding $conf->{confs}{$logconf}[0]{logfile} to $rewind.\n");
+    } else {
+      printlog ("No rewind position to seek to, starting ab initio.\n") unless $rewind;
+      printlog ("Reparse requested, starting ab initio.\n") if $reparse;
     }
+    printlog ("Nocommit requested, dryrun (no actual data written to the database).\n") if $nocommit;
+    $nocommitmsg = ' (But no commit actually done.)' if $nocommit;
 
     my $parser = Loggator::Parser->new( $conf->{confs}{$logconf}[0]{patterns} );
     my $matches = 0;
@@ -178,14 +188,25 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
 	    my $ref = $dbh->selectrow_hashref("SELECT * FROM GkRecords WHERE GkID = '$id' AND ValidFrom = '$before';");
 	    if ($ref) {
 
-	      printlog ("Skipping posted job $ref->{ValidFrom} $ref->{LocalJobID}. \n");
+	      $verbose ? printlog ("Skipping posted job $ref->{ValidFrom} $ref->{LocalJobID}. \n") :
+		printlog ("Skipping $ref->{LocalJobID}.\n") ;
 	      $skipped++ ;
 	  } else {
-	    printlog ("Inserting new job $before $id. \n");
-	    $insGK->execute($id, $jobid, $jobid, 0, $result->{ownerDN}, 'SiGNET', $before, $after) or die $dbh->errstr;;
-	    $insMR->execute($id, $jobid, $jobid, 0, 'SiGNET', $before, $after) or die $dbh->errstr;
+	      unless ($nocommit) {
+		  $verbose ?
+		      printlog ("Inserting new job: $id, $result->{ownerDN}, $before, $after.$nocommitmsg\n") :
+		      printlog ("Inserted: $id.$nocommitmsg\n") ;
+		  $insGK->execute($id, $jobid, $jobid, 0, $result->{ownerDN}, 'SiGNET', $before, $after) or die $dbh->errstr;;
+		  $insMR->execute($id, $jobid, $jobid, 0, 'SiGNET', $before, $after) or die $dbh->errstr;
+	      }
 	    $posted++;
 	    $startfrom = $dt if $posted and not defined $startfrom ;
+
+	    #handle undo
+	    if ($undofile) {
+		print $undofile "INSERT INTO GkRecords (GkID, GramScriptJobID, LocalJobID, Processed, GlobalUserName, SiteName, ValidFrom, ValidUntil) VALUES\n";
+		print $undofile "INSERT INTO MessageRecords (MsgID, GramScriptJobID, JobName, Processed, SiteName, ValidFrom, ValidUntil) VALUES\n";
+	    }
 	    }
 	  }
 	} else {
@@ -201,7 +222,15 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
       }
     }
 
-    printlog ("\t... done. Report: posted $posted, skipped $skipped from " .
+
+    printlog ("\t... done. Report:\n");
+
+    $DB::single = 2;
+
+    $startfrom = DateTime->now() unless defined $startfrom ; #if nothing happened
+    $dt = DateTime->now() unless defined $dt ;               #if nothing happened
+
+    printlog ("+ posted $posted, skipped $skipped from " .
 	      $startfrom->ymd()  . ' ' . $startfrom->hms() . ' to ',
 	      $dt->ymd()  . ' ' . $dt->hms() . "\n");
     printlog ("+ Parser matches: $matches\t Fails: $fails (" .
@@ -216,6 +245,7 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
     }
   }  else  {
     warn "Can't read $conf->{confs}{$logconf}[0]{logfile}, aborting logfile ($!)\n";
+    printlog ("Can't read $conf->{confs}{$logconf}[0]{logfile}, aborting logfile ($!)\n");
     next LOG;
   }
 }
@@ -229,8 +259,8 @@ $dbh->disconnect() or printlog( $dbh->errstr());
 # remember state
 close STATE ;
 printlog ("No state retained. Exiting.")
-  unless (defined $prevpos or defined $rewind) ;
-die "No state retained. Exiting.\n" unless (defined $prevpos or defined $rewind);
+  unless (defined $prevpos or defined $rewind or $nocommit) ;
+die "No state retained. Exiting.\n" unless (defined $prevpos or defined $rewind  or $nocommit);
 
 open STATE, ">", $statefile
   or die "Can't open state dump file $statefile for writing, @!\n";
@@ -257,17 +287,18 @@ sub is {
 
 sub usage {
   print <<"FNORD" ;
-$0:
-
-Incrementaly read new items in NG ARC's gm-jobs log
+\u$progname: Incrementaly read new items in NG ARC's gm-jobs log
 and post them to the gLite's MySQL data base to be handled
 by apel publisher.
 
-$0 tries not to repost anything. The last position
-read in the log is kept in a statefile between runs.
-Grid job entries are fist looked up in the database
-and only posted if not yet present.
+\u$progname tries not to repost anything.
 
+The last position read in the log is kept in a statefile between runs.
+Grid job entries are fist looked up in the database and only posted if
+not yet present.
+
+\u$progname currently parses loggator backend config files,
+but does not use them. This will be added soon.
 
 Options:
 
@@ -284,14 +315,25 @@ Options:
                  of the log.
  --verbose   -v  Print info on STDERR while running.
  --debug     -d  Print more info.
+ --withundo  -u  Write undo files to specified file.
+                 This will append to the file if it exists.
+                 A %d and a %t in the filename will be replaced by
+                 current date and time in the format of yyyy-mm-dd hh-mm-ss.
  --hostname  -H  Hostname of MySQL server for gLite/apel.
                  If empty, no checking and no posting is performed.
  --port      -p  Port for MySQL server
  --database  -b  MySQL server database.
                  Default: '$database'.
- --username  -u  MySQL remote user.
+ --username  -U  MySQL remote user.
                  Default: '$user'.
- --password  -p  MySQL password.
+ --password  -P  MySQL password. (Passwords on command line are insecure!)
  --help      -h  Prints this help.
+
+Example:
+
+  $progname -c /etc/$progname/conf.d -H my.host.org -p 3306 -b accounting \
+     -U accounting -P password123 \
+     -l /var/log/$progname -s /var/state/$progname \
+     -u /var/state/$progname-undo-%d-%t 
 FNORD
 }
