@@ -3,6 +3,8 @@
 use YAML qw( Dump );
 use Data::Dumper;
 
+use warnings;
+
 $data =
     [ 
       { logfile => 'name',
@@ -21,6 +23,7 @@ $data =
       }
     ] ;
 
+$data = { 'SQLite-local' => { db => 'DBI::SQLite', args => { xx => 1, yy => 2 } } };
 
 print Dumper $data;
 print Dump $data;

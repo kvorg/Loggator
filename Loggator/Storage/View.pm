@@ -3,14 +3,12 @@
 # providing export implementation
 # (Define view-building syntax!)
 
-package Storage::View ;
-
-use Storage::DB;
-use Storage::Table;
-
 use strict; use warnings;
 
-use base 'Storage::Table';
+use Loggator::Storage::Table;
+
+package Loggator::Storage::View ;
+use base 'Loggator::Storage::Table';
 
 
 1;

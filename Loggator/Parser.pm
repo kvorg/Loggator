@@ -2,18 +2,8 @@ package Loggator::Parser;
 
 use strict; use warnings;
 use re qw (eval);
-use subs qw (testall);
 
-#non-methods
-sub testall (&@) {
-  my $test = shift;
-  my $status = 1;
-
-  foreach (@_) {
-    $status &&= &$test ;
-  }
-    return $status;
-}
+use Loggator::utils qw( testall ) ;
 
 
 sub new {
@@ -27,7 +17,9 @@ sub new {
   return $self;
 }
 
+
 sub init {
+
   my $self = shift;
   $self->{patterns} = shift ;
   $self->{tags} = {} ;
@@ -35,6 +27,7 @@ sub init {
   $self->{re} = {} ;
 
   foreach (@{$self->{patterns}}) {
+
     my ( $pname ) = keys %{$_};
     push @{$self->{res}}, $pname;  # save pattern order
     $self->{re}{$pname} = buildre( \@{$_->{$pname}{re}} , '$self->{results}');
@@ -46,14 +39,13 @@ sub init {
 
 
 sub buildre {
-    #$DB::single = 2;
-
     my $pttrn = shift;
     my $where = shift;
 
     my $re = join "\n", map {
 	my ($a) = keys %$_;
-	$_->{$a} . ($a =~ m/^_/ ? '' : ' (?{ ' . $where . '{' . $a . '}=$^N })');
+	my $aname = $a; $aname =~ s/([^.]*)([.].+)/$1/ ; #omit types
+	$_->{$a} . ($a =~ m/^_/ ? '' : ' (?{ ' . $where . '{' . $aname . '}=$^N })');
     } @$pttrn;
     return $re;
 }
@@ -63,27 +55,36 @@ sub parse {
   my $self = shift;
   my $line = shift;
 
-  $self->{results} = {} ; # used directly from mangled patterns, as set in init()
+  $self->{results} = {} ; # mangled patterns store directly here
+                          # (mangled by buildre() in init() to use (?{ $^N })
   my $matched;
   my $tags = [];
 
-  $matched = $self->{res}[0] if (m/$self->{re}{$self->{res}[0]}/x) ; #matches fist pattern:
-                                                              #FIX to support many pttrns
-  #TODO: upgrade tags to allow either one match or a named multimatch pattern
-  #use buildre() to build such patterns both for patterns and tags
+  foreach my $pattern (@{$self->{res}}) {
+    if (m/$self->{re}{$pattern}/x) {
+      $matched = $pattern;
 
-  $DB::single = 2;
+      #TODO:
+      # upgrade tags to allow either
+      #  (1) one match or a (2) named multimatch pattern
+      # use buildre() to build such patterns both for patterns and tags
+      #  (buildre() is already updated for the capability)
 
-  @$tags = grep {
-    my $tag = $_;
-    testall { exists $self->{results}{$_}
-		and $self->{results}{$_} =~ m{$self->{tags}{$self->{res}[0]}{$tag}{$_}} ; }
-      keys %{$self->{tags}{$self->{res}[0]}{$tag}} ;
-  } keys %{$self->{tags}{$self->{res}[0]}} ;
+      @$tags = grep {
+	my $tag = $_;
+	testall { exists $self->{results}{$_}
+		    and $self->{results}{$_} =~
+		      m{$self->{tags}{$pattern}{$tag}{$_}} ;
+		}
+	  keys %{$self->{tags}{$pattern}{$tag}} ;
+      } keys %{$self->{tags}{$pattern}} ;
 
-#  print "DEBUG: " . join (', ', keys %{$self->{tags}{$self->{res}[0]}} );
+      last;
+    }
+  }
 
   return ($self->{results}, $matched, $tags);
+  #print "DEBUG: " . join (', ', keys %{$self->{tags}{$self->{res}[0]}} );
 }
 
 1;

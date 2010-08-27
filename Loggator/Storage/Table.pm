@@ -1,11 +1,12 @@
 # interface for a single table in a DB
 # use Storage::DB to talk to the backend
 
-package Storage::Table ;
-
-use Storage::DB;
-
 use strict; use warnings;
+
+#use Loggator::Storage::DB;
+
+
+package Loggator::Storage::Table ;
 
 sub new {
   my $this = shift;
@@ -20,13 +21,34 @@ sub new {
 
 sub init {
   my $self = shift;
+  $self->{backend} = shift;
+  $self->{name}    = shift;
+  $self->{columns} = shift;
+  $self->{types} = shift;
+}
 
-  $self->{db}    = shift ; # a Storage object, used for all communication
-  $self->{table} = shift ; # tablename
+sub columns {
+  my $self = shift;
+  return $self->{columns} ;
+}
 
-  $self->{dbh} = undef;
-  $self->{sth} = undef;
-  $self->{connected} = undef;
+sub types {
+  my $self = shift;
+  return $self->{types} ;
+}
+
+sub insert {
+  my $self = shift;
+  $self->{backend}->insert($self, @_);
+}
+
+sub set_value {
+}
+
+sub select {
+}
+
+sub delete {
 }
 
 
