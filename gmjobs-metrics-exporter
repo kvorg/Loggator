@@ -28,7 +28,7 @@ use DBI;
 
 #setup
 
-my $version = '0.5';
+my $version = '0.6';
 my $progname = $0; $progname =~ s{(.*/)?([^/]+)$}{$2} ;
 
 my $config = 'jobstat.rc' ;
@@ -204,8 +204,8 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
 
 	    #handle undo
 	    if ($undofile) {
-		print $undofile "INSERT INTO GkRecords (GkID, GramScriptJobID, LocalJobID, Processed, GlobalUserName, SiteName, ValidFrom, ValidUntil) VALUES\n";
-		print $undofile "INSERT INTO MessageRecords (MsgID, GramScriptJobID, JobName, Processed, SiteName, ValidFrom, ValidUntil) VALUES\n";
+		print $undofile "INSERT INTO GkRecords (GkID, GramScriptJobID, LocalJobID, Processed, GlobalUserName, SiteName, ValidFrom, ValidUntil) $id, $jobid, $jobid, 0, $result->{ownerDN}, 'SiGNET', $before, $after\n";
+		print $undofile "INSERT INTO MessageRecords (MsgID, GramScriptJobID, JobName, Processed, SiteName, ValidFrom, ValidUntil) $id, $jobid, $jobid, 0, 'SiGNET', $before, $after\n";
 	    }
 	    }
 	  }
