@@ -33,12 +33,12 @@ use DBI;
 
 #setup
 
-my $version = '0.7';
+my $version = '0.8';
 my $progname = $0; $progname =~ s{(.*/)?([^/]+)$}{$2} ;
 
-my $config = 'jobstat.rc' ;
-my $logfile = 'jobstat.log' ;
-my $statefile = 'jobstat.state' ;
+my $config = ' gmjobs-metrics-exporter.rc' ;
+my $logfile = 'gmjobs-metrics-exporter.log' ;
+my $statefile = 'gmjobs-metrics-exporter.state' ;
 my $nocommit = 0;
 my $blahmode = 0;
 my $reparse= 0;
@@ -47,11 +47,11 @@ my $debug = 0;
 my $withundo = 0;
 my $help = 0;
 
-my $hostname = 'xxx.ijs.si';
-my $port =     'xxxx';
-my $database = 'accounting';
-my $user =     'accounting';
-my $passwd =    'xxx';
+my $hostname ;
+my $port ;
+my $database ;
+my $user ;
+my $passwd ;
 
 Getopt::Long::Configure qw(no_ignore_case);
 GetOptions ( 'config|c=s'   => \$config,
@@ -73,6 +73,32 @@ GetOptions ( 'config|c=s'   => \$config,
 
 usage () and exit (0) if $help ;
 
+# Set up output
+open our $log, ">>", $logfile
+  or die "Can't open logfile $logfile, @!\n";
+$| = 1, select $_ for select $log; #log to autoflush :-)
+open STATE, "<", $statefile
+  or warn "Can't open state file $statefile for reading, @!\n" unless $reparse ;
+
+
+# Configuration
+my $conf = Loggator::Confer->new($config);
+$conf->setlog($log);
+$conf->process();
+
+printlog ("Configuration processing of $config finished.\n");
+
+$hostname ||= $conf->{backends}{exporter}{args}{host};
+$port ||= $conf->{backends}{exporter}{args}{port};
+$database ||= $conf->{backends}{exporter}{args}{database};
+$user ||= $conf->{backends}{exporter}{args}{user};
+
+#my $storage = Loggator::Storage->new( $conf->{backends}, $conf->{confs}  );
+#$DB::single = 2;
+
+print "Host:$hostname\nPort:$port\n$database:$user\n";
+exit;
+
 my $prevpos ;
 my $lastpos ;
 my $previd ;
@@ -84,11 +110,6 @@ my $dt ;
 my $undofile ;
 my $nocommitmsg = '';
 
-open our $log, ">>", $logfile
-  or die "Can't open logfile $logfile, @!\n";
-$| = 1, select $_ for select $log; #log to autoflush :-)
-open STATE, "<", $statefile
-  or warn "Can't open state file $statefile for reading, @!\n" unless $reparse ;
 
 printlog ("\u$progname v $version starting.\n");
 
@@ -112,15 +133,6 @@ if ($withundo) {
 }
 
 
-# Configuration
-my $conf = Loggator::Confer->new($config);
-$conf->setlog($log);
-$conf->process();
-
-printlog ("Configuration processing of $config finished.\n");
-
-#my $storage = Loggator::Storage->new( $conf->{backends}, $conf->{confs}  );
-#$DB::single = 2;
 
 my $rewind = 0;
 
