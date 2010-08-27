@@ -153,9 +153,9 @@
             message: '^Have connections: (\d+), max: (\d+)'
           job-data:
             message: '^(:? RELATION|BOOLEAN):'
-          job-data-realtionyes:
+          job-data-relation-yes:
             message: '^RELATION: (\w+) = (.*)$'
-          job-data-realtionno:
+          job-data-relation-no:
             message: '^RELATION: (\w+) != (.*)$'
           job-data-boolean:
             message: '^BOOLEAN: (\w+)$'

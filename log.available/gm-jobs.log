@@ -1,4 +1,5 @@
 - logfile: /afs/f9.ijs.si/home/jona/Projects/NG-logmonitor/var/gm-jobs.log
+  storage: 'SQLite-local'
   patterns:
     - standard:
         re:
