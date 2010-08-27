@@ -14,6 +14,11 @@
 # It gets all data on previous run from checking with lcgce's mysql
 # so it should republish missing things.
 
+#Remember:
+# GkRecords <- globus gatekeeper logs
+# EventRecords <- brenta pbs (torque) logs
+# BlahdRecords <-  grid-jobmap* in /opt/edg/var/gatekeeper <- globus submit script
+# MessageRecords <- /var/log/messag
 
 use strict; use warnings;
 
@@ -28,13 +33,14 @@ use DBI;
 
 #setup
 
-my $version = '0.6';
+my $version = '0.7';
 my $progname = $0; $progname =~ s{(.*/)?([^/]+)$}{$2} ;
 
 my $config = 'jobstat.rc' ;
 my $logfile = 'jobstat.log' ;
 my $statefile = 'jobstat.state' ;
 my $nocommit = 0;
+my $blahmode = 0;
 my $reparse= 0;
 my $verbose = 0;
 my $debug = 0;
@@ -53,9 +59,10 @@ GetOptions ( 'config|c=s'   => \$config,
              'statefile|s=s'=> \$statefile,
 	     'nocommit|n'   => \$nocommit,
 	     'reparse|r'    => \$reparse,
+	     'blahmode|B'   => \$blahmode,
 	     'verbose|v'    => \$verbose,
 	     'debug|d'      => \$debug,
-	     'withundo|u=s' => \$withundo, 
+	     'withundo|u=s' => \$withundo,
 	     'hostname|H=s' => \$hostname,
 	     'port|p=i'     => \$port,
 	     'database|b=s' => \$database,
@@ -137,8 +144,9 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
       printlog ("No rewind position to seek to, starting ab initio.\n") unless $rewind;
       printlog ("Reparse requested, starting ab initio.\n") if $reparse;
     }
-    printlog ("Nocommit requested, dryrun (no actual data written to the database).\n") if $nocommit;
+    printlog ("Nocommit requested, dryrun (no actual data written to the database or state file).\n") if $nocommit;
     $nocommitmsg = ' (But no commit actually done.)' if $nocommit;
+    printlog ("Blahmode engaged, only BladhRecords table is used.\n") if $reparse;
 
     my $parser = Loggator::Parser->new( $conf->{confs}{$logconf}[0]{patterns} );
     my $matches = 0;
@@ -149,6 +157,7 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
 
     my $insGK = $dbh->prepare('INSERT INTO GkRecords (GkID, GramScriptJobID, LocalJobID, Processed, GlobalUserName, SiteName, ValidFrom, ValidUntil) VALUES ( ?, ?, ?, ?, ?, ?, ?, ? );') or die $dbh->errstr;;
     my $insMR = $dbh->prepare('INSERT INTO MessageRecords (MsgID, GramScriptJobID, JobName, Processed, SiteName, ValidFrom, ValidUntil) VALUES (?, ?, ?, ?, ?, ?, ?);') or die $dbh->errstr;
+    my $insBLAHd = $dbh->prepare('INSERT INTO BlahdRecords (BlahdID, TimeStamp, GlobalUserName, FullyQualifiedAttributeName, ResourceIdentity, GlobalJobId, LrmsId, JobName, SiteName, ValidFrom, ValidUntil, Processed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? );') or die $dbh->errstr;
 
     while (<$log>) {
       my %this_tags = ();
@@ -180,34 +189,47 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
 	  my $before = $dt_before->ymd() ;
 	  my $after  = $dt_after->ymd()  ;
 	  my $jobid  = $result->{lrmsid} ? $result->{lrmsid} . '.ijs.si' : 'ERROR';
+	  my $joburi  = $result->{jobid} ? 'gsiftp://pikolit.ijs.si:2811/jobs/' . $result->{jobid} : 'ERROR';
+	  my $resourceid = $result->{queuename} ? $result->{queuename} . '@pikolit.ijs.si'  : 'ERROR';
 	  my $id = "$date $result->{time} $jobid brenta.ijs.si SiGNET";
+	  my $blahid = "$date $result->{time} $joburi $resourceid $jobid";
 
 	  # FIXTHIS to check if it is in, warn to log (die if several)
 	  #         else insertnano
 	  if ($hostname) {
 	    my $ref = $dbh->selectrow_hashref("SELECT * FROM GkRecords WHERE GkID = '$id' AND ValidFrom = '$before';");
-	    if ($ref) {
-
-	      $verbose ? printlog ("Skipping posted job $ref->{ValidFrom} $ref->{LocalJobID}. \n") :
-		printlog ("Skipping $ref->{LocalJobID}.\n") ;
+	    my $blahref = $dbh->selectrow_hashref("SELECT * FROM BlahdRecords WHERE LrmsId = '$jobid' AND ValidFrom = '$before';");
+	    if ( $ref or $blahref ) {
+	      my $vf = $ref ? $ref->{Validfrom} : $blahref->{ValidFrom};
+	      my $jn = $ref ? $ref->{LocalJobID} : $blahref->{JobName};
+	      $verbose ? printlog ("Skipping posted job $vf $jn. \n") :
+		printlog ("Skipping $jn.\n") ;
 	      $skipped++ ;
 	  } else {
-	      unless ($nocommit) {
-		  $verbose ?
-		      printlog ("Inserting new job: $id, $result->{ownerDN}, $before, $after.$nocommitmsg\n") :
-		      printlog ("Inserted: $id.$nocommitmsg\n") ;
-		  $insGK->execute($id, $jobid, $jobid, 0, $result->{ownerDN}, 'SiGNET', $before, $after) or die $dbh->errstr;;
-		  $insMR->execute($id, $jobid, $jobid, 0, 'SiGNET', $before, $after) or die $dbh->errstr;
+	    unless ($nocommit) {
+	      $verbose ?
+		printlog ("Inserting new job: $id, $result->{ownerDN}, $before, $after.$nocommitmsg\n") :
+		  printlog ("Inserted: $id.$nocommitmsg\n") ;
+	      unless ($blahmode) {
+		$insGK->execute($id, $jobid, $jobid, 0, $result->{ownerDN}, 'SiGNET', $before, $after) or die $dbh->errstr;;
+		$insMR->execute($id, $jobid, $jobid, 0, 'SiGNET', $before, $after) or die $dbh->errstr;
+	      } else {
+		$insBLAHd->execute($blahid, "$date $result->{time}", '', 'NULL', $resourceid, $joburi, $jobid, $jobid, 'SiGNET', $before, $after, 0) or die $dbh->errstr;
 	      }
+	    }
 	    $posted++;
 	    $startfrom = $dt if $posted and not defined $startfrom ;
 
 	    #handle undo
 	    if ($undofile) {
-		print $undofile "INSERT INTO GkRecords (GkID, GramScriptJobID, LocalJobID, Processed, GlobalUserName, SiteName, ValidFrom, ValidUntil) $id, $jobid, $jobid, 0, $result->{ownerDN}, 'SiGNET', $before, $after\n";
-		print $undofile "INSERT INTO MessageRecords (MsgID, GramScriptJobID, JobName, Processed, SiteName, ValidFrom, ValidUntil) $id, $jobid, $jobid, 0, 'SiGNET', $before, $after\n";
+	      unless ($blahmode) {
+		print $undofile "INSERT INTO GkRecords (GkID, GramScriptJobID, LocalJobID, Processed, GlobalUserName, SiteName, ValidFrom, ValidUntil) VALUES ('$id', '$jobid', '$jobid', 0, '$result->{ownerDN}', 'SiGNET', '$before', '$after') ;\n";
+		print $undofile "INSERT INTO MessageRecords (MsgID, GramScriptJobID, JobName, Processed, SiteName, ValidFrom, ValidUntil) VALUES ('$id', '$jobid', '$jobid', 0, 'SiGNET', '$before', '$after') ;\n";
+	      } else {
+		print $undofile "INSERT INTO BlahdRecords (BlahdID, TimeStamp, GlobalUserName, FullyQualifiedAttributeName, ResourceIdentity, GlobalJobId, LrmsId, JobName, SiteName, ValidFrom, ValidUntil, Processed) VALUES ( '$blahid', '$date $result->{time}', '', 'NULL', '$resourceid', '$joburi', '$jobid', '$jobid', 'SiGNET', '$before', '$after', 0 );\n";
+	      }
 	    }
-	    }
+	  }
 	  }
 	} else {
 	printlog ("SKIPPING STRANGE OBJECT:\n$_\n" . Dumper(\$result, \%this_tags) . "\n") ;
@@ -258,12 +280,13 @@ $dbh->disconnect() or printlog( $dbh->errstr());
 
 # remember state
 close STATE ;
-printlog ("No state retained. Exiting.")
-  unless (defined $prevpos or defined $rewind or $nocommit) ;
-die "No state retained. Exiting.\n" unless (defined $prevpos or defined $rewind  or $nocommit);
+if (not defined $prevpos or not defined $rewind or $nocommit) {
+  printlog ("No state retained. Exiting.");
+  die "No state retained. Exiting.\n";
+}
 
 open STATE, ">", $statefile
-  or die "Can't open state dump file $statefile for writing, @!\n";
+  or die "Can't open state dump file $statefile for writing (no state retainded), @!\n";
 
 $dt = DateTime->now();
 print STATE join(' ',
@@ -293,12 +316,17 @@ by apel publisher.
 
 \u$progname tries not to repost anything.
 
+
 The last position read in the log is kept in a statefile between runs.
 Grid job entries are fist looked up in the database and only posted if
 not yet present.
 
-\u$progname currently parses loggator backend config files,
-but does not use them. This will be added soon.
+Warning: \u$progname sets any log member variable to ERROR if it is
+missing when it expects it to be set, but currently does not report
+this in any way.
+
+Warning: \u$progname currently parses loggator backend config files,
+but does not use them. This should be added soon.
 
 Options:
 
@@ -309,7 +337,9 @@ Options:
  --statefile -s  Statefile where last byte position read and last line
                  is kept between runs. Default: '$statefile'.
                  If empty, no state is preserved.
- --nocommit  -c  Do nothing, just parse the log file and check
+ --blahmode  -B  Use the new mode, where BladhRecords is used
+                 (without writing to the other tables).
+ --nocommit  -n  Do nothing, just parse the log file and check
                  for duplicates in the database.
  --reparse   -r  Ignore the state file, start from the beginning
                  of the log.
@@ -331,7 +361,7 @@ Options:
 
 Example:
 
-  $progname -c /etc/$progname/conf.d -H my.host.org -p 3306 -b accounting \
+  $progname -c /etc/$progname/conf.d -H my.host.org -p 3306 -b accounting -B \
      -U accounting -P password123 \
      -l /var/log/$progname -s /var/state/$progname \
      -u /var/state/$progname-undo-%d-%t 
