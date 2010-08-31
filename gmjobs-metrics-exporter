@@ -36,7 +36,7 @@ use DBI;
 my $version = '0.8';
 my $progname = $0; $progname =~ s{(.*/)?([^/]+)$}{$2} ;
 
-my $config = ' gmjobs-metrics-exporter.rc' ;
+my $config = 'gmjobs-metrics-exporter.rc' ;
 my $logfile = 'gmjobs-metrics-exporter.log' ;
 my $statefile = 'gmjobs-metrics-exporter.state' ;
 my $nocommit = 0;
