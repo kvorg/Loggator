@@ -402,7 +402,7 @@ Options take precedence.
                  uri of the job on the ARC frontend is customary, with the
                  prefix in this format:
                    gsiftp://arcfrontend.example.com:2811/jobs/
- --queuename     Frontend name with the \@ prefix, to construct the quename
+ --queuename     Frontend name with the \@ prefix, to construct the queuename
                  in the format queueanem\@arcfrontend.example.com.
                  Should start with '\@'.
  --batchname     DNS name for the batch manager.
