@@ -57,6 +57,12 @@ my $user ;
 my $passwd ;
 my $transaction ;
 
+my $sitename;
+my $dns_suffix;
+my $joburi_prefix;
+my $queuename;
+my $batchname;
+
 Getopt::Long::Configure qw(no_ignore_case);
 GetOptions ( 'config|c=s'   => \$config,
 	     'logfile|l=s'  => \$logfile,
@@ -73,6 +79,11 @@ GetOptions ( 'config|c=s'   => \$config,
 	     'username|U=s' => \$user,
 	     'password|P=s' => \$passwd,
 	     'transaction|t=i' => \$transaction,
+	     'sitename=s'   => \$sitename,
+	     'dns=s'        => \$dns_suffix,
+	     'joburi_prefix=s' => \$joburi_prefix,
+	     'queuename=s'  => \$queuename,
+	     'batchname=s'  => \$batchname,
 	     'help|h'       => \$help,
 	   );
 
@@ -93,11 +104,18 @@ $conf->process();
 
 printlog ("Configuration processing of $config finished.\n");
 
-$hostname ||= $conf->{backends}{exporter}{args}{hostname};
-$port ||= $conf->{backends}{exporter}{args}{port};
-$database ||= $conf->{backends}{exporter}{args}{database};
-$user ||= $conf->{backends}{exporter}{args}{user};
+$hostname    ||= $conf->{backends}{exporter}{args}{hostname};
+$port        ||= $conf->{backends}{exporter}{args}{port};
+$database    ||= $conf->{backends}{exporter}{args}{database};
+$user        ||= $conf->{backends}{exporter}{args}{user};
 $transaction ||= $conf->{backends}{exporter}{transaction};
+
+$sitename      ||= $conf->{site}{sitename};
+$dns_suffix    ||= $conf->{site}{dns_suffix};
+$joburi_prefix ||= $conf->{site}{joburi_prefix};
+$queuename     ||= $conf->{site}{queuename};
+$batchname     ||= $conf->{site}{batchname};
+
 
 #my $storage = Loggator::Storage->new( $conf->{backends}, $conf->{confs}  );
 #$DB::single = 2;
@@ -203,10 +221,11 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
 	  my $date   = $dt->ymd() ;
 	  my $before = $dt_before->ymd() ;
 	  my $after  = $dt_after->ymd()  ;
-	  my $jobid  = $result->{lrmsid} ? $result->{lrmsid} . '.ijs.si' : 'ERROR';
-	  my $joburi  = $result->{jobid} ? 'gsiftp://pikolit.ijs.si:2811/jobs/' . $result->{jobid} : 'ERROR';
-	  my $resourceid = $result->{queuename} ? $result->{queuename} . '@pikolit.ijs.si'  : 'ERROR';
-	  my $id = "$date $result->{time} $jobid brenta.ijs.si SiGNET";
+
+	  my $jobid  = $result->{lrmsid} ? $result->{lrmsid} . $dns_suffix : 'ERROR';
+	  my $joburi  = $result->{jobid} ? $joburi_prefix . $result->{jobid} : 'ERROR';
+	  my $resourceid = $result->{queuename} ? $result->{queuename} . $queuename  : 'ERROR';
+	  my $id = "$date $result->{time} $jobid $batchname $sitename";
 	  my $blahid = "$date $result->{time} $joburi $resourceid $jobid";
 
 	  # FIXTHIS to check if it is in, warn to log (die if several)
@@ -224,14 +243,14 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
 	      $verbose ?
 		printlog ("Inserting new job: $id, $result->{ownerDN}, $before, $after.$nocommitmsg\n") :
 		  printlog ("Inserted: $id. $nocommitmsg\n") ;
-		$insBLAHd->execute($blahid, "$date $result->{time}", '', 'NULL', $resourceid, $joburi, $jobid, $jobid, 'SiGNET', $before, $after, 0) or die $dbh->errstr;
+		$insBLAHd->execute($blahid, "$date $result->{time}", '', 'NULL', $resourceid, $joburi, $jobid, $jobid, $sitename, $before, $after, 0) or die $dbh->errstr;
 	    }
 	    $posted++;
 	    $startfrom = $dt if $posted and not defined $startfrom ;
 
 	    #handle undo
 	    if ($undofile) {
-		print $undofile "INSERT INTO BlahdRecords (BlahdID, TimeStamp, GlobalUserName, FullyQualifiedAttributeName, ResourceIdentity, GlobalJobId, LrmsId, JobName, SiteName, ValidFrom, ValidUntil, Processed) VALUES ( '$blahid', '$date $result->{time}', '', 'NULL', '$resourceid', '$joburi', '$jobid', '$jobid', 'SiGNET', '$before', '$after', 0 );\n";
+		print $undofile "INSERT INTO BlahdRecords (BlahdID, TimeStamp, GlobalUserName, FullyQualifiedAttributeName, ResourceIdentity, GlobalJobId, LrmsId, JobName, SiteName, ValidFrom, ValidUntil, Processed) VALUES ( '$blahid', '$date $result->{time}', '', 'NULL', '$resourceid', '$joburi', '$jobid', '$jobid', $sitename, '$before', '$after', 0 );\n";
 	    }
 	  }
 	  }
@@ -372,10 +391,30 @@ config file. Options take precedence.
                  If not set, everything is commited at the end.
                  Default: '$transaction'.
 
+Following are the site settings, settable aslo in the site config file.
+Options take precedence.
+
+ --sitename      Descriptive name of the site.
+ --dns_suffix    The DNS suffix of the site - used in batch logs,
+                 but ommited in gmjobs.log. This must correspond to the
+                 batch logs for the batch job ids to match.
+ --joburi_prefix Used to construct the job uri data; for ARC jobs, a gridftp
+                 uri of the job on the ARC frontend is customary, with the
+                 prefix in this format:
+                   gsiftp://arcfrontend.example.com:2811/jobs/
+ --queuename     Frontend name with the \@ prefix, to construct the quename
+                 in the format queueanem\@arcfrontend.example.com.
+                 Should start with '\@'.
+ --batchname     DNS name for the batch manager.
+
+
 Example:
 
-  $progname -c /etc/$progname/conf.d -H my.host.org -p 3306 -b accounting \
-     -U accounting -P password123 -t 200\
+  $progname -c /etc/$progname/conf.d -H my.host.org -p 3306 \
+     -b accounting -U accounting -P password123 -t 200\
+     --sitename SiGNET --dns_suffix .ijs.si \
+     --joburi_prefix gsiftp://pikolit.ijs.si:2811/jobs/ \
+     --queuename \@pikolit.ijs.si --batchname brenta.ijs.si \
      -l /var/log/$progname -s /var/state/$progname \
      -u /var/state/$progname-undo-%d-%t 
 FNORD
