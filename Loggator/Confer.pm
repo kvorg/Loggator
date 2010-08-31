@@ -41,10 +41,11 @@ sub receive {
   my $confid = shift;
   my $confdata = shift;
 
-  if ( $confid eq 'backends.conf' ) { # XXX ugly hack
-      $self->{backends} = $confdata;
-  }
-  else {
+  if ( $confid =~ m/.*[.]conf$/ ) { # XXX ugly hack
+      $confid =~ s/^(.*)[.]conf$/$1/;
+      print ">>$confid<<\n";
+      $self->{$confid} = $confdata;
+  } else {
       $self->printlog("Overwriting existing configuration for $confid.\n") 
 	  if exists $self->{confs}{$confid};
       $self->{confs}{$confid} = $confdata;
