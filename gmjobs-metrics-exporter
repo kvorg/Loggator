@@ -40,7 +40,7 @@ my $config = 'gmjobs-metrics-exporter.rc' ;
 my $logfile = 'gmjobs-metrics-exporter.log' ;
 my $statefile = 'gmjobs-metrics-exporter.state' ;
 my $nocommit = 0;
-my $blahmode = 0;
+my $blahmode = 1;
 my $reparse= 0;
 my $verbose = 0;
 my $debug = 0;
@@ -158,7 +158,6 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
     }
     printlog ("Nocommit requested, dryrun (no actual data written to the database or state file).\n") if $nocommit;
     $nocommitmsg = ' (But no commit actually done.)' if $nocommit;
-    printlog ("Blahmode engaged, only BladhRecords table is used.\n") if $reparse;
 
     my $parser = Loggator::Parser->new( $conf->{confs}{$logconf}[0]{patterns} );
     my $matches = 0;
@@ -167,8 +166,6 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
     my %tags = ();
     my $lastpos; my $prepos ; my $preid ;
 
-    my $insGK = $dbh->prepare('INSERT INTO GkRecords (GkID, GramScriptJobID, LocalJobID, Processed, GlobalUserName, SiteName, ValidFrom, ValidUntil) VALUES ( ?, ?, ?, ?, ?, ?, ?, ? );') or die $dbh->errstr;;
-    my $insMR = $dbh->prepare('INSERT INTO MessageRecords (MsgID, GramScriptJobID, JobName, Processed, SiteName, ValidFrom, ValidUntil) VALUES (?, ?, ?, ?, ?, ?, ?);') or die $dbh->errstr;
     my $insBLAHd = $dbh->prepare('INSERT INTO BlahdRecords (BlahdID, TimeStamp, GlobalUserName, FullyQualifiedAttributeName, ResourceIdentity, GlobalJobId, LrmsId, JobName, SiteName, ValidFrom, ValidUntil, Processed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? );') or die $dbh->errstr;
 
     while (<$log>) {
@@ -209,11 +206,10 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
 	  # FIXTHIS to check if it is in, warn to log (die if several)
 	  #         else insertnano
 	  if ($hostname) {
-	    my $ref = $dbh->selectrow_hashref("SELECT * FROM GkRecords WHERE GkID = '$id' AND ValidFrom = '$before';");
-	    my $blahref = $dbh->selectrow_hashref("SELECT * FROM BlahdRecords WHERE LrmsId = '$jobid' AND ValidFrom = '$before';");
-	    if ( $ref or $blahref ) {
-	      my $vf = $ref ? $ref->{Validfrom} : $blahref->{ValidFrom};
-	      my $jn = $ref ? $ref->{LocalJobID} : $blahref->{JobName};
+	    my $ref = $dbh->selectrow_hashref("SELECT * FROM BlahdRecords WHERE LrmsId = '$jobid' AND ValidFrom = '$before';");
+	    if ( $ref ) {
+	      my $vf = $ref->{Validfrom} ;
+	      my $jn = $ref->{LocalJobID} ;
 	      $verbose ? printlog ("Skipping posted job $vf $jn. \n") :
 		printlog ("Skipping $jn.\n") ;
 	      $skipped++ ;
@@ -221,25 +217,15 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
 	    unless ($nocommit) {
 	      $verbose ?
 		printlog ("Inserting new job: $id, $result->{ownerDN}, $before, $after.$nocommitmsg\n") :
-		  printlog ("Inserted: $id.$nocommitmsg\n") ;
-	      unless ($blahmode) {
-		$insGK->execute($id, $jobid, $jobid, 0, $result->{ownerDN}, 'SiGNET', $before, $after) or die $dbh->errstr;;
-		$insMR->execute($id, $jobid, $jobid, 0, 'SiGNET', $before, $after) or die $dbh->errstr;
-	      } else {
+		  printlog ("Inserted: $id. $nocommitmsg\n") ;
 		$insBLAHd->execute($blahid, "$date $result->{time}", '', 'NULL', $resourceid, $joburi, $jobid, $jobid, 'SiGNET', $before, $after, 0) or die $dbh->errstr;
-	      }
 	    }
 	    $posted++;
 	    $startfrom = $dt if $posted and not defined $startfrom ;
 
 	    #handle undo
 	    if ($undofile) {
-	      unless ($blahmode) {
-		print $undofile "INSERT INTO GkRecords (GkID, GramScriptJobID, LocalJobID, Processed, GlobalUserName, SiteName, ValidFrom, ValidUntil) VALUES ('$id', '$jobid', '$jobid', 0, '$result->{ownerDN}', 'SiGNET', '$before', '$after') ;\n";
-		print $undofile "INSERT INTO MessageRecords (MsgID, GramScriptJobID, JobName, Processed, SiteName, ValidFrom, ValidUntil) VALUES ('$id', '$jobid', '$jobid', 0, 'SiGNET', '$before', '$after') ;\n";
-	      } else {
 		print $undofile "INSERT INTO BlahdRecords (BlahdID, TimeStamp, GlobalUserName, FullyQualifiedAttributeName, ResourceIdentity, GlobalJobId, LrmsId, JobName, SiteName, ValidFrom, ValidUntil, Processed) VALUES ( '$blahid', '$date $result->{time}', '', 'NULL', '$resourceid', '$joburi', '$jobid', '$jobid', 'SiGNET', '$before', '$after', 0 );\n";
-	      }
 	    }
 	  }
 	  }
@@ -259,7 +245,6 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
 
     printlog ("\t... done. Report:\n");
 
-    $DB::single = 2;
 
     $startfrom = DateTime->now() unless defined $startfrom ; #if nothing happened
     $dt = DateTime->now() unless defined $dt ;               #if nothing happened
@@ -348,9 +333,10 @@ Options:
                  If empty, no log is kept. Default value: '$logfile'.
  --statefile -s  Statefile where last byte position read and last line
                  is kept between runs. Default: '$statefile'.
-                 If empty, no state is preserved.
- --blahmode  -B  Use the new mode, where BladhRecords is used
-                 (without writing to the other tables).
+                 If empty, no state is preserved and the log is always
+                 parsed from the start, which is slow.
+ --blahmode  -B  Compatibiliy switch for the new mode (blah table)
+                 This is now the default, and the old mode is disabled.
  --nocommit  -n  Do nothing, just parse the log file and check
                  for duplicates in the database.
  --reparse   -r  Ignore the state file, start from the beginning
