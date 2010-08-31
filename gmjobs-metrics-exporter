@@ -14,8 +14,11 @@
 # It gets all data on previous run from checking with lcgce's mysql
 # so it should republish missing things.
 
+# Todo: are all options supported?
+# Finish transaction size support.
+
 #Remember:
-# GkRecords <- globus gatekeeper logs
+# GkRecords <- globus gatekeeper logs - obsoleted
 # EventRecords <- brenta pbs (torque) logs
 # BlahdRecords <-  grid-jobmap* in /opt/edg/var/gatekeeper <- globus submit script
 # MessageRecords <- /var/log/messag
@@ -52,6 +55,7 @@ my $port ;
 my $database ;
 my $user ;
 my $passwd ;
+my $transaction ;
 
 Getopt::Long::Configure qw(no_ignore_case);
 GetOptions ( 'config|c=s'   => \$config,
@@ -67,7 +71,8 @@ GetOptions ( 'config|c=s'   => \$config,
 	     'port|p=i'     => \$port,
 	     'database|b=s' => \$database,
 	     'username|U=s' => \$user,
-	     'password|P=s' => \$passwd,   #FIXME: need use of backend conf file!
+	     'password|P=s' => \$passwd,
+	     'transaction|t=i' => \$transaction,
 	     'help|h'       => \$help,
 	   );
 
@@ -88,15 +93,16 @@ $conf->process();
 
 printlog ("Configuration processing of $config finished.\n");
 
-$hostname ||= $conf->{backends}{exporter}{args}{host};
+$hostname ||= $conf->{backends}{exporter}{args}{hostname};
 $port ||= $conf->{backends}{exporter}{args}{port};
 $database ||= $conf->{backends}{exporter}{args}{database};
 $user ||= $conf->{backends}{exporter}{args}{user};
+$transaction ||= $conf->{backends}{exporter}{transaction};
 
 #my $storage = Loggator::Storage->new( $conf->{backends}, $conf->{confs}  );
 #$DB::single = 2;
 
-print "Host:$hostname\nPort:$port\n$database:$user\n";
+print "Host:$hostname\nPort:$port\n$database:$user (tranactions of $transaction)\n";
 exit;
 
 my $prevpos ;
@@ -270,10 +276,12 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
 }
 
 # commit to db
+printlog( "Commiting to the database ...\n");
 $dbh->commit() or
   ( printlog( $dbh->errstr() . ", exiting.\n" )
     and die $dbh->errstr() ) ;
 $dbh->disconnect() or printlog( $dbh->errstr());
+printlog( "Done.\n");
 
 # remember state
 close STATE ;
@@ -347,6 +355,11 @@ Options:
                  This will append to the file if it exists.
                  A %d and a %t in the filename will be replaced by
                  current date and time in the format of yyyy-mm-dd hh-mm-ss.
+ --help      -h  Prints this help.
+
+Following are the backend database settings, settable also in the backends
+config file. Options take precedence.
+
  --hostname  -H  Hostname of MySQL server for gLite/apel.
                  If empty, no checking and no posting is performed.
  --port      -p  Port for MySQL server
@@ -355,12 +368,14 @@ Options:
  --username  -U  MySQL remote user.
                  Default: '$user'.
  --password  -P  MySQL password. (Passwords on command line are insecure!)
- --help      -h  Prints this help.
+ --transaction -t  The number of insertions to put in a single transaction.
+                 If not set, everything is commited at the end.
+                 Default: '$transaction'.
 
 Example:
 
-  $progname -c /etc/$progname/conf.d -H my.host.org -p 3306 -b accounting -B \
-     -U accounting -P password123 \
+  $progname -c /etc/$progname/conf.d -H my.host.org -p 3306 -b accounting \
+     -U accounting -P password123 -t 200\
      -l /var/log/$progname -s /var/state/$progname \
      -u /var/state/$progname-undo-%d-%t 
 FNORD
