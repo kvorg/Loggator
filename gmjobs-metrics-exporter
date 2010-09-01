@@ -120,8 +120,8 @@ $batchname     ||= $conf->{site}{batchname};
 #my $storage = Loggator::Storage->new( $conf->{backends}, $conf->{confs}  );
 #$DB::single = 2;
 
-printlog "Config info:\nHost: $hostname\nPort: $port\nConnection $database:$user (tranactions of $transaction)\n\nSite: $sitename\nDNS suffix: $dns_suffix\nJobURI prefix: $joburi_prefix\n
-Queuename: $queuename, Batchname $batchname\n" if $verbose;
+printlog("Config info:\nHost: $hostname\nPort: $port\nConnection $database:$user (tranactions of $transaction)\n\nSite: $sitename\nDNS suffix: $dns_suffix\nJobURI prefix: $joburi_prefix\n
+Queuename: $queuename, Batchname $batchname\n") if $verbose;
 
 my $prevpos ;
 my $lastpos ;
