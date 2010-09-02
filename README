@@ -108,17 +108,18 @@ least the first line as its information has been already inserted in
 the database.
 
 For the first run, you can copy and perhaps edit the start-up script
-provided in scripts/startup.sh
+provided in examples/scripts/startup.sh
 
 
 CRON JOB
 
 For the regular runs, you should run the script as a daily cron
-job. Examples and a short explanation are provided in cron.d/. Please
-note that the cron job is best run after the daily PBS parser APEL job
-on the batch server and before the APEL posting job on the main APEL
-instance, since this makes sure that your daily statistics will be
-published to the central accounting database timely.
+job. Examples and a short explanation are provided in
+examples/cron.d/, see examples/cron.d/README. Please note that the
+cron job is best run after the daily PBS parser APEL job on the batch
+server and before the APEL posting job on the main APEL instance,
+since this makes sure that your daily statistics will be published to
+the central accounting database timely.
 
 After posting, APEL should mark the posted entries by changing the
 value 'Processed' from '0' to '1'.
