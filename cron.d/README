@@ -1,0 +1,8 @@
+# This is an example of how to install the exporter as a cron job. It presumes the default
+# setup of apel installations - the cron job should run after the apel parsing jobs and
+# complete before the apel posting job to ensure correct and timely publication.
+#
+# This presumes installation in /opt/gmjobs-metrics-exporter
+#
+cp gmjobs-metrics-export /etc/cron.d/gmjobs-metrics-export # the cron job
+cp gmjobs-metrics-exporter.sh /opt/gmjobs-metrics-exporter/gmjobs-metrics-exporter.sh # script called
