@@ -108,6 +108,7 @@ $hostname    ||= $conf->{backends}{exporter}{args}{hostname};
 $port        ||= $conf->{backends}{exporter}{args}{port};
 $database    ||= $conf->{backends}{exporter}{args}{database};
 $user        ||= $conf->{backends}{exporter}{args}{user};
+$passwd      ||= $conf->{backends}{exporter}{args}{password};
 $transaction ||= $conf->{backends}{exporter}{transaction};
 
 $sitename      ||= $conf->{site}{sitename};
@@ -222,7 +223,7 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
 	  my $before = $dt_before->ymd() ;
 	  my $after  = $dt_after->ymd()  ;
 
-	  my $jobid  = $result->{lrmsid} ? $result->{lrmsid} . $dns_suffix : 'ERROR';
+	  my $jobid  = $result->{lrmsid} ? $result->{lrmsid} . '.' . $dns_suffix : 'ERROR';
 	  my $joburi  = $result->{jobid} ? $joburi_prefix . $result->{jobid} : 'ERROR';
 	  my $resourceid = $result->{queuename} ? $result->{queuename} . $queuename  : 'ERROR';
 	  my $id = "$date $result->{time} $jobid $batchname $sitename";
@@ -233,8 +234,8 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
 	  if ($hostname) {
 	    my $ref = $dbh->selectrow_hashref("SELECT * FROM BlahdRecords WHERE LrmsId = '$jobid' AND ValidFrom = '$before';");
 	    if ( $ref ) {
-	      my $vf = $ref->{Validfrom} ;
-	      my $jn = $ref->{LocalJobID} ;
+	      my $vf = $ref->{ValidFrom} ;
+	      my $jn = $ref->{LrmsId} ;
 	      $verbose ? printlog ("Skipping posted job $vf $jn. \n") :
 		printlog ("Skipping $jn.\n") ;
 	      $skipped++ ;
