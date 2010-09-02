@@ -1,10 +1,12 @@
+=head1 LOGGATOR AND GMJOBS-METRICS-EXPORTER
+
 This package contains gmjobs-metrics-exporter, a script that can parse
 NorduGrid ARC GridManager logs and insert the extracted information in
 a MySQL database in the format understood by APEL. In this way, it can
 be used to post grid accounting data from ARC frontends using the APEL
 gLite service.
 
-This package is build on top of Loggator, a project (very much
+This package is build on top of C<Loggator>, a project (very much
 work-in-progress) to construct generci log parsers. Only a part of the
 project is needed (and only the needed parts and examples are included
 in default tar archives and installation support).
@@ -12,12 +14,18 @@ in default tar archives and installation support).
 This package has the following dependecies (all of which are perl
 packages, installable as distribution packages on most distributions:
 
-* YAML
-* Date::Time
-* DBD::MySQL (and DBI)
+=over 4
+
+=item * YAML
+
+=item * Date::Time
+
+=item * DBD::MySQL (and DBI)
+
+=back
 
 
-INSTALLATION
+=head2 INSTALLATION
 
 The script and its package should be installed on the NorduGrid ARC
 frontend whose logs it will parse, or, alternatively, have access to
@@ -26,7 +34,7 @@ will be a long-running process with a slow and unidirectional file access
 pattern.
 
 It can be installed manually or using the provided Makefile.
-The default installation location is /opt/gmjobs-metrics-exporter/
+The default installation location is C</opt/gmjobs-metrics-exporter/>
 The provided example configuration files use this location.
 
 To install with the provided Makefile:
@@ -34,9 +42,9 @@ To install with the provided Makefile:
  make install
 
 
-CONFIGURATION
+=head2 CONFIGURATION
 
-A. DB Access
+=head3 DB Access
 
 Before usage, you need to set the MySQL database connection
 information to allow connection to the database instance used by APEL
@@ -56,7 +64,7 @@ interface on the server:
 Please make sure that the config file is not world-readable since it
 will contain the DB password.
 
-B. Site Information
+=head3 Site Information
 
 In addition, you have to set the site information needed to transform
 the data in a format that APEL can understand:
@@ -64,7 +72,7 @@ the data in a format that APEL can understand:
  /opt/gmjobs-metrics-exporter/gmjobs-metrics-exporter.rc/site.conf
 
 
-C. Log
+=head3 Log
 
 You can change the location of the ARC GridManager log file by editing
 the log parser configuration file:
@@ -78,9 +86,9 @@ the first line:
 
 The rest of this config file defines the behaviour of the log parser
 itself. The behaviour is defined by two structures inside the standar
-pattern definition, namely the @re array, which is a list of regular
+pattern definition, namely the C<@re> array, which is a list of regular
 expressions defining a perl 5.8-compatible named-capture regular
-expression (with non-named parts prefixed with _), and the %tags hash.
+expression (with non-named parts prefixed with C<_>), and the C<%tags> hash.
 
 The tags hash contains key-value pairs, which specify the target named
 capture and a regular expression. If the named capture exists and the
@@ -96,10 +104,10 @@ implemented at this point. If you need this feature, contributions are
 welcome.
 
 
-FIRST RUN
+=head2 FIRST RUN
 
-For the first run, you have to specify the -s option to create a
-status file, and the -r option to force the reparsing of the file
+For the first run, you have to specify the C<-s> option to create a
+status file, and the C<-r> option to force the reparsing of the file
 since the status file does not exist yet. At later invocations, the
 status file will be used so that the script will restart parsing at
 the point where it stopped the last time. Please note that the script
@@ -108,14 +116,14 @@ least the first line as its information has been already inserted in
 the database.
 
 For the first run, you can copy and perhaps edit the start-up script
-provided in examples/scripts/startup.sh
+provided in C<examples/scripts/startup.sh>.
 
 
-CRON JOB
+=head2 CRON JOB
 
 For the regular runs, you should run the script as a daily cron
 job. Examples and a short explanation are provided in
-examples/cron.d/, see examples/cron.d/README. Please note that the
+C<examples/cron.d/>, see C<examples/cron.d/README>. Please note that the
 cron job is best run after the daily PBS parser APEL job on the batch
 server and before the APEL posting job on the main APEL instance,
 since this makes sure that your daily statistics will be published to
@@ -125,33 +133,38 @@ After posting, APEL should mark the posted entries by changing the
 value 'Processed' from '0' to '1'.
 
 
-BUGS AND TODOS
+=head2 BUGS AND TODOS
 
 Surely many, but among other things:
 
-* no logrotate support
+=over 4
 
-* no support for user->VO mapping (in progress)
+=item * no logrotate support
 
-* the so-called undo files are really just fake sql dumps
+=item * no support for user->VO mapping (in progress)
 
-* too slow
+=item * the so-called undo files are really just fake sql dumps
 
-* should terminate gracefully on SIGHUP, writing a state-file
+=item * too slow
 
-* no -C option to insert a limited number of entries, needed at
+=item * should terminate gracefully on C<SIGHUP>, writing a state-file
+
+=item * no C<-C> option to insert a limited number of entries, needed at
   startup, debugging etc.
 
+=back
 
-IN ADDITION
+=head2 IN ADDITION
 
-Under examples/, you can find parsing configuration files for PBS logs
-and gridftpd logs. While they have absolutely nothing to do, you might
-want to take a look at them and use the Loggator infrastructure for a
-different application. Good luck ;-)
+Under C<examples/>, you can find parsing configuration files for PBS
+logs and gridftpd logs. While they have absolutely nothing to do, you
+might want to take a look at them and use the Loggator infrastructure
+for a different application. Good luck ;-)
 
-CREDITS
+=head2 CREDITS
 
 This script is a work in progress, improvements are welcome.
 
 jona.javorsek@ijs.si
+
+=cut
