@@ -143,8 +143,6 @@ Surely many, but among other things:
 
 =item * no support for user->VO mapping (in progress)
 
-=item * the so-called undo files are really just fake sql dumps
-
 =item * too slow
 
 =item * should terminate gracefully on C<SIGHUP>, writing a state-file

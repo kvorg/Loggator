@@ -36,7 +36,7 @@ use DBI;
 
 #setup
 
-my $version = '0.8';
+my $version = '0.9';
 my $progname = $0; $progname =~ s{(.*/)?([^/]+)$}{$2} ;
 
 my $config = 'gmjobs-metrics-exporter.rc' ;
@@ -153,7 +153,8 @@ if ($withundo) {
     my $time = $start->hms() ;
     $withundo =~ s{%d}{$date}g ;
     $withundo =~ s{%t}{$time}g ;
-    open ($undofile, '>>', $withundo) or printlog ("Failed to open undo file $withundo: $!\n");
+    open ($undofile, '>>', $withundo) or printlog ("Failed to open undo file $withundo: $!\n")
+      and $withundo = 0;
     printlog ("Writing undo to $withundo.\n") if $undofile ;
 }
 
@@ -232,7 +233,7 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
 	  # FIXTHIS to check if it is in, warn to log (die if several)
 	  #         else insertnano
 	  if ($hostname) {
-	    my $ref = $dbh->selectrow_hashref("SELECT * FROM BlahdRecords WHERE LrmsId = '$jobid' AND ValidFrom = '$before';");
+	    my $ref = $dbh->selectrow_hashref("SELECT * FROM BlahdRecords WHERE LrmsId = '$jobid' AND ValidFrom = '$before';"); #is this a horrible bug?
 	    if ( $ref ) {
 	      my $vf = $ref->{ValidFrom} ;
 	      my $jn = $ref->{LrmsId} ;
@@ -242,7 +243,7 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
 	  } else {
 	    unless ($nocommit) {
 	      $verbose ?
-		printlog ("Inserting new job: $id, $result->{ownerDN}, $before, $after.$nocommitmsg\n") :
+		printlog ("Inserting new job: $id, $result->{ownerDN}, $before, $after. $nocommitmsg\n") :
 		  printlog ("Inserted: $id. $nocommitmsg\n") ;
 		$insBLAHd->execute($blahid, "$date $result->{time}", '', 'NULL', $resourceid, $joburi, $jobid, $jobid, $sitename, $before, $after, 0) or die $dbh->errstr;
 	    }
@@ -251,7 +252,8 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
 
 	    #handle undo
 	    if ($undofile) {
-		print $undofile "INSERT INTO BlahdRecords (BlahdID, TimeStamp, GlobalUserName, FullyQualifiedAttributeName, ResourceIdentity, GlobalJobId, LrmsId, JobName, SiteName, ValidFrom, ValidUntil, Processed) VALUES ( '$blahid', '$date $result->{time}', '', 'NULL', '$resourceid', '$joburi', '$jobid', '$jobid', $sitename, '$before', '$after', 0 );\n";
+		#print $undofile "# INSERT INTO BlahdRecords (BlahdID, TimeStamp, GlobalUserName, FullyQualifiedAttributeName, ResourceIdentity, GlobalJobId, LrmsId, JobName, SiteName, ValidFrom, ValidUntil, Processed) VALUES ( '$blahid', '$date $result->{time}', '', 'NULL', '$resourceid', '$joburi', '$jobid', '$jobid', $sitename, '$before', '$after', 0 );\n";
+		print $undofile "DELETE FROM BlahdRecords WHERE BlahdID='$blahid';\n";
 	    }
 	  }
 	  }
