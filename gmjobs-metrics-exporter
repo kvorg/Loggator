@@ -204,7 +204,13 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
     my %tags = ();
     my $lastpos; my $prepos ; my $preid ;
 
-    my $insBLAHd = $dbh->prepare('INSERT INTO BlahdRecords (BlahdID, TimeStamp, GlobalUserName, FullyQualifiedAttributeName, ResourceIdentity, GlobalJobId, LrmsId, JobName, SiteName, ValidFrom, ValidUntil, Processed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? );') or die $dbh->errstr;
+    my $insBLAHd = $dbh->prepare('INSERT IGNORE INTO BlahdRecords (BlahdID, TimeStamp, GlobalUserName, FullyQualifiedAttributeName, ResourceIdentity, GlobalJobId, LrmsId, JobName, SiteName, ValidFrom, ValidUntil, Processed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? );') or die $dbh->errstr;
+    $dbh->{HandleError} = sub { 
+      warn "SQL failed with @_\n";
+      printlog ("SQL failed with @_\nExiting.\n");
+      warn "Exiting.\n";
+      die "Exited due to SQL error @_.\n";
+    };
 
     while (<$log>) {
       my %this_tags = ();
@@ -244,29 +250,36 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
 
 	  # FIXTHIS to check if it is in, warn to log (die if several)
 	  #         else insertnano
-	  if ($hostname) {
-	    my $ref = $dbh->selectrow_hashref("SELECT * FROM BlahdRecords WHERE LrmsId = '$jobid' AND ValidFrom = '$before';"); #is this a horrible bug?
+	  if ($hostname and $nocommit) {
+	    my $ref = $dbh->selectrow_hashref("SELECT * FROM BlahdRecords WHERE BlahdID = '$blahid' ;");
 	    if ( $ref ) {
 	      my $vf = $ref->{ValidFrom} ;
 	      my $jn = $ref->{LrmsId} ;
-	      $verbose ? printlog ("Skipping posted job $vf $jn. \n") :
-		printlog ("Skipping $jn.\n") ;
+	      printlog ("Skipping existing $blahid.\n") ;
 	      $skipped++ ;
 	  } else {
 	    unless ($nocommit) {
 	      $verbose ?
 		printlog ("Inserting new job: $id, $result->{ownerDN}, $before, $after. $nocommitmsg\n") :
 		  printlog ("Inserted: $id. $nocommitmsg\n") ;
-		$insBLAHd->execute($blahid, "$date $result->{time}", '', 'NULL', $resourceid, $joburi, $jobid, $jobid, $sitename, $before, $after, 0) or die $dbh->errstr;
-	    }
-	    $posted++;
+	      my $insert = $insBLAHd->execute($blahid, "$date $result->{time}", '', 'NULL', $resourceid, $joburi, $jobid, $jobid, $sitename, $before, $after, 0);
+	      die $dbh->errstr unless $insert;
+	      if ($insert == 0) {
+		printlog ("Skipping existing $blahid.\n") ;
+		$skipped++ ;
+	      } else {
+		$posted++;
+		if ($undofile) {
+		  print $undofile "DELETE FROM BlahdRecords WHERE BlahdID='$blahid';\n";
+		}
+	      }
+	    } else {
+		$posted++;
+		if ($undofile) {
+		  print $undofile "DELETE FROM BlahdRecords WHERE BlahdID='$blahid';\n";
+		}
+	      }
 	    $startfrom = $dt if $posted and not defined $startfrom ;
-
-	    #handle undo
-	    if ($undofile) {
-		#print $undofile "# INSERT INTO BlahdRecords (BlahdID, TimeStamp, GlobalUserName, FullyQualifiedAttributeName, ResourceIdentity, GlobalJobId, LrmsId, JobName, SiteName, ValidFrom, ValidUntil, Processed) VALUES ( '$blahid', '$date $result->{time}', '', 'NULL', '$resourceid', '$joburi', '$jobid', '$jobid', $sitename, '$before', '$after', 0 );\n";
-		print $undofile "DELETE FROM BlahdRecords WHERE BlahdID='$blahid';\n";
-	    }
 	  }
 	  }
 	} else {
