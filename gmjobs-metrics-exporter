@@ -35,10 +35,12 @@ use Data::Dumper ;
 use DateTime ;
 use DBI;
 
+
 #setup
 
 END { savestate(); }
 
+use vars qw($state);
 my $version = '0.10';
 my $progname = $0; $progname =~ s{(.*/)?([^/]+)$}{$2} ;
 
@@ -98,7 +100,7 @@ usage () and exit (0) if $help ;
 open our $log, ">>", $logfile
   or die "Can't open logfile $logfile, @!\n";
 $| = 1, select $_ for select $log; #log to autoflush :-)
-open STATE, "<", $statefile
+open $state, "<", $statefile
   or warn "Can't open state file $statefile for reading, @!\n" unless $reparse ;
 
 
@@ -168,7 +170,7 @@ if ($withundo) {
 my $rewind = 0;
 
 unless ($reparse) {
-  while (<STATE>) {
+  while (<$state>) {
     m/^\S+\s+\S+\s+(\d+)/ ;
     $rewind = $1 ;
   }
@@ -191,7 +193,7 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
       printlog ("Jumping $conf->{confs}{$logconf}[0]{logfile} to $jumpto by regex scan.\n");
       while (<$log>) {
 	next unless m{$jumpto};
-	printlog ("Started processing of $conf->{confs}{$logconf}[0]{logfile} at:\n  $_\n");
+	printlog ("\nStarted processing of $conf->{confs}{$logconf}[0]{logfile} at:\n  $_\n");
 	last;
       }
     }
@@ -214,6 +216,8 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
       die "Exited due to SQL error @_.\n";
     };
 
+    printlog("Processing starts.\n") if $verbose;
+
     while (<$log>) {
       my %this_tags = ();
       my ($result, $match, $tags) = $parser->parse($_);
@@ -231,7 +235,7 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
 	   and $match eq 'standard'
 	   and exists $this_tags{finished}
 	 and not exists $this_tags{failed} ) {
-	if ( defined $result->{date}
+ 	if ( defined $result->{date}
 		 and defined $result->{time}
 		 and defined $result->{lrmsid}
 		 and defined $result->{ownerDN} ) {
@@ -250,6 +254,9 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
 	  my $id = "$date $result->{time} $jobid $batchname $sitename";
 	  my $blahid = "$date $result->{time} $joburi $resourceid $jobid";
 
+	  #printlog ("Parsed job: $id, $result->{ownerDN}, $before, $after. $nocommitmsg\n") if $verbose;
+
+
 	  # FIXTHIS to check if it is in, warn to log (die if several)
 	  #         else insertnano
 	  if ($hostname and $nocommit) {
@@ -259,6 +266,7 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
 	      my $jn = $ref->{LrmsId} ;
 	      printlog ("Skipping existing $blahid.\n") ;
 	      $skipped++ ;
+	    }
 	  } else {
 	    unless ($nocommit) {
 	      $verbose ?
@@ -276,13 +284,12 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
 		}
 	      }
 	    } else {
-		$posted++;
-		if ($undofile) {
-		  print $undofile "DELETE FROM BlahdRecords WHERE BlahdID='$blahid';\n";
-		}
+	      $posted++;
+	      if ($undofile) {
+		print $undofile "DELETE FROM BlahdRecords WHERE BlahdID='$blahid';\n";
 	      }
-	    $startfrom = $dt if $posted and not defined $startfrom ;
-	  }
+	      $startfrom = $dt if $posted and not defined $startfrom ;
+	    }
 	  }
 	} else {
 	printlog ("SKIPPING STRANGE OBJECT:\n$_\n" . Dumper(\$result, \%this_tags) . "\n") ;
@@ -308,7 +315,7 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
 	      $startfrom->ymd()  . ' ' . $startfrom->hms() . ' to ',
 	      $dt->ymd()  . ' ' . $dt->hms() . "\n");
     printlog ("+ Parser matches: $matches\t Fails: $fails (" .
-      sprintf ("%4.2f", ( $fails / ($fails + $matches) * 100)) . " %)\n");
+      sprintf ("%4.2f", ( $fails + $matches ? ( $fails / ($fails + $matches) * 100) : 0) ). " %)\n") ;
     printlog ("+ Matched patterns:\n");
     foreach (keys %matches) {
       printlog ('+' . sprintf ("%32s:\t%9d (%04.2f %%)\n", $_, $matches{$_}, ($matches{$_} / ($fails + $matches) * 100))) ;
@@ -334,17 +341,17 @@ printlog( "Done.\n");
 savestate();
 
 sub savestate {
-  close STATE ;
+  close $state ;
   if (not defined $prevpos or not defined $rewind or $nocommit) {
     printlog ("No state retained. Exiting.");
     die "No state retained. Exiting.\n";
   }
 
-  open STATE, ">", $statefile
+  open $state, ">", $statefile
     or die "Can't open state dump file $statefile for writing (no state retainded), @!\n";
 
   $dt = DateTime->now();
-  print STATE join(' ',
+  print $state join(' ',
 		   $dt->ymd(), $dt->hms(), defined $prevpos ? $prevpos : $rewind,
 		   $previd ? '[' . $previd . ']' : ''), "\n";
   printlog ("Finished at " .
