@@ -37,7 +37,9 @@ use DBI;
 
 #setup
 
-my $version = '0.9';
+END { savestate(); }
+
+my $version = '0.10';
 my $progname = $0; $progname =~ s{(.*/)?([^/]+)$}{$2} ;
 
 my $config = 'gmjobs-metrics-exporter.rc' ;
@@ -329,25 +331,26 @@ $dbh->commit() or
     and die $dbh->errstr() ) ;
 $dbh->disconnect() or printlog( $dbh->errstr());
 printlog( "Done.\n");
+savestate();
 
-# remember state
-close STATE ;
-if (not defined $prevpos or not defined $rewind or $nocommit) {
-  printlog ("No state retained. Exiting.");
-  die "No state retained. Exiting.\n";
+sub savestate {
+  close STATE ;
+  if (not defined $prevpos or not defined $rewind or $nocommit) {
+    printlog ("No state retained. Exiting.");
+    die "No state retained. Exiting.\n";
+  }
+
+  open STATE, ">", $statefile
+    or die "Can't open state dump file $statefile for writing (no state retainded), @!\n";
+
+  $dt = DateTime->now();
+  print STATE join(' ',
+		   $dt->ymd(), $dt->hms(), defined $prevpos ? $prevpos : $rewind,
+		   $previd ? '[' . $previd . ']' : ''), "\n";
+  printlog ("Finished at " .
+	    (defined $prevpos ? $prevpos : $rewind ) . ' ' .
+	    ($previd ? '[' . $previd . ']' : '') . ".\n") ;
 }
-
-open STATE, ">", $statefile
-  or die "Can't open state dump file $statefile for writing (no state retainded), @!\n";
-
-$dt = DateTime->now();
-print STATE join(' ',
-		 $dt->ymd(), $dt->hms(), defined $prevpos ? $prevpos : $rewind,
-		 $previd ? '[' . $previd . ']' : ''), "\n";
-printlog ("Finished at " .
-	  (defined $prevpos ? $prevpos : $rewind ) . ' ' .
-	  ($previd ? '[' . $previd . ']' : '') . ".\n") ;
-
 
 sub printlog {
   return unless defined $logfile;
