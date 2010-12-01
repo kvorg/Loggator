@@ -16,6 +16,7 @@
 
 # Todo: are all options supported?
 # Finish transaction size support.
+# fix local time in logs etc
 
 #Remember:
 # GkRecords <- globus gatekeeper logs - obsoleted
@@ -49,6 +50,7 @@ my $verbose = 0;
 my $debug = 0;
 my $withundo = 0;
 my $help = 0;
+my $jumpto = undef;
 
 my $hostname ;
 my $port ;
@@ -69,6 +71,7 @@ GetOptions ( 'config|c=s'   => \$config,
              'statefile|s=s'=> \$statefile,
 	     'nocommit|n'   => \$nocommit,
 	     'reparse|r'    => \$reparse,
+	     'jumpto|j=s'    => \$jumpto,
 	     'blahmode|B'   => \$blahmode,
 	     'verbose|v'    => \$verbose,
 	     'debug|d'      => \$debug,
@@ -169,7 +172,6 @@ unless ($reparse) {
   }
 }
 
-
 LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
   if ( open my $log, "<", $conf->{confs}{$logconf}[0]{logfile} )    {
 
@@ -182,6 +184,16 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
       printlog ("No rewind position to seek to, starting ab initio.\n") unless $rewind;
       printlog ("Reparse requested, starting ab initio.\n") if $reparse;
     }
+
+    if ($jumpto) {
+      printlog ("Jumping $conf->{confs}{$logconf}[0]{logfile} to $jumpto by regex scan.\n");
+      while (<$log>) {
+	next unless m{$jumpto};
+	printlog ("Started processing of $conf->{confs}{$logconf}[0]{logfile} at:\n  $_\n");
+	last;
+      }
+    }
+
     printlog ("Nocommit requested, dryrun (no actual data written to the database or state file).\n") if $nocommit;
     $nocommitmsg = ' (But no commit actually done.)' if $nocommit;
 
@@ -365,6 +377,13 @@ Options:
                  is kept between runs. Default: '$statefile'.
                  If empty, no state is preserved and the log is always
                  parsed from the start, which is slow.
+ --jumpto -j     The argument should be a fixed string or a regular
+                 expression.  The parser will jump to the location
+                 specified by the state file if any, then skip forward and
+                 only start parsing when a match for the string or
+                 expression is found. This can be used when a
+                 statefile is not generated after a failure to speed
+                 up the system.
  --blahmode  -B  Compatibiliy switch for the new mode (blah table)
                  This is now the default, and the old mode is disabled.
  --nocommit  -n  Do nothing, just parse the log file and check
