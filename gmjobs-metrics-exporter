@@ -41,7 +41,7 @@ use DBI;
 END { savestate(); }
 
 use vars qw($state);
-my $version = '0.10';
+my $version = '0.11';
 my $progname = $0; $progname =~ s{(.*/)?([^/]+)$}{$2} ;
 
 my $config = 'gmjobs-metrics-exporter.rc' ;
@@ -239,8 +239,15 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
 		 and defined $result->{time}
 		 and defined $result->{lrmsid}
 		 and defined $result->{ownerDN} ) {
-	  $result->{date} =~ m/^(\d+)-(\d+)-(\d+)$/;
-	  my ($day, $month, $year) = ($1, $2, $3);
+	  my ($day, $month, $year);
+	  if ($result->{date} =~ m/^(\d{4})-(\d{2})-(\d{2})$/) {
+	    ($day, $month, $year) = ($3, $2, $1);
+	  } elsif ($result->{date} =~ m/^(\d{2})-(\d{2})-(\d{4})$/) {
+	    ($day, $month, $year) = ($1, $2, $3);
+	  } else {
+	    printlog ("DAMN: date string not paresable, tried dd-mm-yyyy and yyy-mm-dd!\n$_\n");
+	    $fails++;
+	  }
 	  $dt = new DateTime ( month => $month, day => $day, year => $year );
 	  my $dt_before = $dt - new DateTime::Duration( days => 1);
 	  my $dt_after  = $dt + new DateTime::Duration( days => 28);

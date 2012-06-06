@@ -4,10 +4,10 @@
     - standard:
         re:
           - _open: '^\0*\s*'
-          - date: '(\d{2}-\d{2}-\d{4}) \s+'
+          - date: '((?:\d{4}-\d{2}-\d{2})|(?:\d{2}-\d{2}-\d{4})) \s+'
           - time: '(\d{2}:\d{2}:\d{2}) \s+'
           - type: (Started|Finished) \s+ -
-          - jobid: '\s+ job \s id: \s+ (\d+)'
+          - jobid: '\s+ job \s id: \s+ ([a-zA-Z0-9]+)'
           - unixuser: ', \s+ unix \s user: \s+ (\d+:\d+)'
           - _jobopen: '(:? ()'
           - jobname: ', \s+ name: \s+ "([^"]*)"'
