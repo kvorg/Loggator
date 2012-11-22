@@ -1,0 +1,16 @@
+* make CPAN installable
+* make tests
+* steal Mojo::Base
+* make thin DB layer for exports
+* encapsulate:
+** one-time parser
+** one-time command STDOUT parser
+* add hooks
+* encapsulate grid accounting with hooks
+* package grid accounting as an app
+
+* encapsulate:
+** logtail
+* develop thin DB layer into DB model
+* add web interface for context
+* package daemon + web interface as an app

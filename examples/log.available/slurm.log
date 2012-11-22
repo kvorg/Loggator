@@ -1,0 +1,36 @@
+- logcommand: 'sub { my ($from, $to) = @_; my $r = `sacct -a -s CA,CD,F,TO -S $from -E $to --format JobID,Submit,JobName,AssocID,Account,User,Group,Cluster,Cputime,ncpus,nnodes,nodelist,Elapsed,TotalCPU,MaxVMSize,MaxRSS,Eligible,Start,End,State,ExitCode`; return $r; }'
+  patterns:
+    - job:
+        re:
+          - jobid:            '([|]+)\|'
+          - submit.timestamp: '([|]+)\|'
+          - jobname:          '([|]+)\|'
+          - associd:          '([|]+)\|'
+          - account           '([|]+)\|'
+          - user:             '([|]+)\|'
+          - group:            '([|]+)\|'
+          - cluster:          '([|]+)\|'
+          - cputime:          '([|]+)\|'
+          - no_of_cpus:       '([|]+)\|'
+          - no_of_nodes:      '([|]+)\|'
+          - node_list:        '([|]+)\|'
+          - walltime:         '([|]+)\|'
+          - used_cput:        '([|]+)\|'
+          - max_vmem:         '([|]+)\|'
+          - max_rss:          '([|]+)\|'
+          - eligible.timestamp: '([|]+)\|'
+          - start.timestamp:  '([|]+)\|'
+          - end.timestamp:    '([|]+)\|'
+          - status:           '([|]+)\|'
+          - exit.status:      '([|]+)\|'
+        tags:
+          jobend:
+            jobid: '.'
+          atlas_kitvalidation:
+            jobname: '^KitValidation-'
+          deletion:
+            status: 'DELETED'
+          failure:
+            status: 'FAILED'
+          exit_non_zero:
+            exit_status: '^[^0]+$'

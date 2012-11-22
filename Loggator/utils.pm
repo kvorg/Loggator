@@ -10,7 +10,7 @@ require Exporter;
 
 Subroutine C<testall> is prototyped with a syntax similar to map with
 a block: it applies the block to all the elements of its list
-argument, ands the result and return the value.
+argument, ands the result and returns the value.
 
 This is to be used when one or more conditions have to be tested on a
 list of values.
