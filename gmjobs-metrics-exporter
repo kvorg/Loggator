@@ -70,6 +70,7 @@ my $dns_suffix;
 my $joburi_prefix;
 my $queuename;
 my $batchname;
+my $hideowner;
 
 Getopt::Long::Configure qw(no_ignore_case);
 GetOptions ( 'config|c=s'   => \$config,
@@ -93,6 +94,7 @@ GetOptions ( 'config|c=s'   => \$config,
 	     'joburi_prefix=s' => \$joburi_prefix,
 	     'queuename=s'  => \$queuename,
 	     'batchname=s'  => \$batchname,
+	     'hideowner'    => \$hideowner,
 	     'help|h'       => \$help,
 	   );
 
@@ -247,7 +249,7 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
 	  } elsif ($result->{date} =~ m/^(\d{2})-(\d{2})-(\d{4})$/) {
 	    ($day, $month, $year) = ($1, $2, $3);
 	  } else {
-	    printlog ("DAMN: date string not paresable, tried dd-mm-yyyy and yyy-mm-dd!\n$_\n");
+	    printlog ("DAMN: date string not parseable, tried dd-mm-yyyy and yyy-mm-dd!\n$_\n");
 	    $fails++;
 	  }
 	  $dt = new DateTime ( month => $month, day => $day, year => $year );
@@ -257,14 +259,26 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
 	  my $before = $dt_before->ymd() ;
 	  my $after  = $dt_after->ymd()  ;
 
-	  my $jobid  = $result->{lrmsid} ? $result->{lrmsid} . '.' . $dns_suffix : 'ERROR';
+	  my $jobid = $result->{lrmsid};
+	  if ($jobid) {
+	    $jobid .= ($dns_suffix ? '.' . $dns_suffix : '');
+	  } else {
+	    $jobid = 'ERROR';
+	  }
 	  my $joburi  = $result->{jobid} ? $joburi_prefix . $result->{jobid} : 'ERROR';
-	  my $resourceid = $result->{queuename} ? $result->{queuename} . $queuename  : 'ERROR';
+	  my $resourceid = $result->{queuename};
+	  if ($resourceid) {
+	    $resourceid .= ($queuename ? $queuename : '')
+	      unless $resourceid eq $queuename;
+	  } else {
+	    $resourceid = $queuename ? $queuename : 'ERROR';
+	  }
 	  my $id = "$date $result->{time} $jobid $batchname $sitename";
 	  my $blahid = "$date $result->{time} $joburi $resourceid $jobid";
+	  my $owner = $result->{ownerDN};
 
-	  #printlog ("Parsed job: $id, $result->{ownerDN}, $before, $after. $nocommitmsg\n") if $verbose;
-
+	  #printlog ("Parsed job: $id, $owner, $before, $after. $nocommitmsg\n") if $verbose;
+	  $owner = 'NULL' if $hideowner;
 
 	  # FIXTHIS to check if it is in, warn to log (die if several)
 	  #         else insertnano
@@ -279,9 +293,9 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
 	  } else {
 	    unless ($nocommit) {
 	      $verbose ?
-		printlog ("Inserting new job: $id, $result->{ownerDN}, $before, $after. $nocommitmsg\n") :
+		printlog ("Inserting new job: $id, $owner, $before, $after. $nocommitmsg\n") :
 		  printlog ("Inserted: $id. $nocommitmsg\n") ;
-	      my $insert = $insBLAHd->execute($blahid, "$date $result->{time}", '', 'NULL', $resourceid, $joburi, $jobid, $jobid, $sitename, $before, $after, 0);
+	      my $insert = $insBLAHd->execute($blahid, "$date $result->{time}", '', $owner, $resourceid, $joburi, $jobid, $jobid, $sitename, $before, $after, 0);
 	      die $dbh->errstr unless $insert;
 	      if ($insert == 0) {
 		printlog ("Skipping existing $blahid.\n") ;
@@ -449,17 +463,22 @@ Following are the site settings, settable aslo in the site config file.
 Options take precedence.
 
  --sitename      Descriptive name of the site.
- --dns_suffix    The DNS suffix of the site - used in batch logs,
-                 but ommited in gmjobs.log. This must correspond to the
-                 batch logs for the batch job ids to match.
+ --dns_suffix    The DNS suffix of the site - used in some kinds of LRMS logs
+                 when ommited in gmjobs.log. This must correspond to the
+                 LRMS logs for the LRMS job ids to match.
+                 Needed for PBS-like LRMS, for example.
  --joburi_prefix Used to construct the job uri data; for ARC jobs, a gridftp
                  uri of the job on the ARC frontend is customary, with the
                  prefix in this format:
                    gsiftp://arcfrontend.example.com:2811/jobs/
  --queuename     Frontend name with the \@ prefix, to construct the queuename
                  in the format queueanem\@arcfrontend.example.com.
-                 Should start with '\@'.
- --batchname     DNS name for the batch manager.
+                 Should start with '\@'. Ignored if not set, empty or equal
+                 to an actua queue.
+ --batchname     DNS name for the batch manager. Needed to match some LRMS
+                 records, such as used by PBS and PBS-like LRMS
+ --hideowner     If set, NULL is reported instead of the Distinguished Name
+                 of the job owner
 
 
 Example:
