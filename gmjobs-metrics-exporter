@@ -28,12 +28,14 @@ use strict; use warnings;
 
 use Getopt::Long ;
 
-use Loggator::Confer ;
-use Loggator::Parser ;
-#use Loggator::Storage ; #wishful future
 use Data::Dumper ;
 use DateTime ;
 use DBI;
+
+use 'lib';
+use Loggator::Confer ;
+use Loggator::Parser ;
+#use Loggator::Storage ; #wishful future
 
 
 #setup

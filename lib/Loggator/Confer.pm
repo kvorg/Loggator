@@ -43,7 +43,7 @@ sub receive {
 
   if ( $confid =~ m/.*[.]conf$/ ) { # XXX ugly hack
       $confid =~ s/^(.*)[.]conf$/$1/;
-      print ">>$confid<<\n";
+      #print ">>$confid<<\n";
       $self->{$confid} = $confdata;
   } else {
       $self->printlog("Overwriting existing configuration for $confid.\n") 
