@@ -269,7 +269,7 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
 	    $resourceid .= ($queuename ? $queuename : '')
 	      unless $resourceid eq $queuename;
 	  } else {
-	    $resourceid = $queuename ? $queuename : 'ERROR');
+	    $resourceid = $queuename ? $queuename : 'ERROR';
 	  }
 	  my $id = "$date $result->{time} $jobid $batchname $sitename";
 	  my $blahid = "$date $result->{time} $joburi $resourceid $jobid";
