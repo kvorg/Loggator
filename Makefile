@@ -26,3 +26,6 @@ install:
 
 all:
 	echo "No default target. Use 'tar' 'clean' or 'install'.
+
+test:
+	prove
