@@ -17,6 +17,8 @@
 # Todo: are all options supported?
 # Finish transaction size support.
 # fix local time in logs etc
+# make rewind less hackish and per log
+# time to trasition and refactor?
 
 #Remember:
 # GkRecords <- globus gatekeeper logs - obsoleted
@@ -183,7 +185,9 @@ unless ($reparse) {
 
 LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
   if ( not $conf->{confs}{$logconf}[0]{logfile} and $conf->{confs}{$logconf}[0]{logcommand}) {
-    my ($from, $to) = ('2012-10-01', '2012-10-02');
+    # we pretend to be generic, but this is really slurm - perhaps we need hooks in logs?
+    my $dt = DateTime->today;
+    my ($from, $to) = ($dt->subtract(days => 1)->ymd, $dt->ymd); #From yesterday to today
     my $cmd = "$conf->{confs}{$logconf}[0]{logcommand}";
     my $tmpfile = mktemp('/tmp', 'gmjobs_$logconf_tmp_XXXXX');
     eval "\$cmd = $cmd . ' > \$tmpfile'"; #eval perl vars in $cmd?
