@@ -31,6 +31,7 @@ use Getopt::Long ;
 use Data::Dumper ;
 use DateTime ;
 use DBI;
+use File::Temp qw( :mktemp);
 
 use 'lib';
 use Loggator::Confer ;
@@ -181,6 +182,15 @@ unless ($reparse) {
 }
 
 LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
+  if ( not $conf->{confs}{$logconf}[0]{logfile} and $conf->{confs}{$logconf}[0]{logcommand}) {
+    my ($from, $to) = ('2012-10-01', '2012-10-02');
+    my $cmd = "$conf->{confs}{$logconf}[0]{logcommand}";
+    my $tmpfile = mktemp('/tmp', 'gmjobs_$logconf_tmp_XXXXX');
+    eval "\$cmd = $cmd . ' > \$tmpfile'"; #eval perl vars in $cmd?
+    printlog("Getting log data for [$logconf]: $cmd ...\n");
+    system $cmd or printlog "  $cmd failed:\n $?" ;
+    $conf->{confs}{$logconf}[0]{logfile} = $tmpfile;
+  }
   if ( open my $log, "<", $conf->{confs}{$logconf}[0]{logfile} )    {
 
     printlog("Parsing [$logconf]: $conf->{confs}{$logconf}[0]{logfile} ...\n");
