@@ -33,7 +33,7 @@ use DateTime ;
 use DBI;
 use File::Temp qw( :mktemp);
 
-use 'lib';
+use lib 'lib';
 use Loggator::Confer ;
 use Loggator::Parser ;
 #use Loggator::Storage ; #wishful future
@@ -188,7 +188,7 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
     my $tmpfile = mktemp('/tmp', 'gmjobs_$logconf_tmp_XXXXX');
     eval "\$cmd = $cmd . ' > \$tmpfile'"; #eval perl vars in $cmd?
     printlog("Getting log data for [$logconf]: $cmd ...\n");
-    system $cmd or printlog "  $cmd failed:\n $?" ;
+    system $cmd or printlog("  $cmd failed:\n $?") ;
     $conf->{confs}{$logconf}[0]{logfile} = $tmpfile;
   }
   if ( open my $log, "<", $conf->{confs}{$logconf}[0]{logfile} )    {
