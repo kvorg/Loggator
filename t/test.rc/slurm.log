@@ -28,9 +28,11 @@
             jobid: '.'
           atlas_kitvalidation:
             jobname: '^KitValidation-'
-          deletion:
+          deleted:
             status: 'DELETED'
-          failure:
+          failed:
             status: 'FAILED'
+          finished:
+            status: 'COMPLETED'
           exit_non_zero:
             exit_status: '^[^0]+$'

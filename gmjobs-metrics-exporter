@@ -199,6 +199,58 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
 
     printlog("Parsing [$logconf]: $conf->{confs}{$logconf}[0]{logfile} ...\n");
 
+    if ($logconf eq 'slurm.log') {
+      printlog("Triggered slurm workaround.\n");
+
+      my $parser = Loggator::Parser->new( $conf->{confs}{$logconf}[0]{patterns} );
+      my $matches = 0;
+      my %matches = ();
+      my $fails = 0;
+      my %tags = ();
+
+      my $insEventRecords 
+	= $dbh->prepare('INSERT IGNORE INTO EventRecords (' .
+			'EventID, SiteName, LocalUserID, LocalUserGroup, ' .
+			'WallDuration, CpuDuration, ' . 
+			'WallDurationSeconds, CpuDurationSeconds, ' .
+			'StartTime, StopTime, StartTimeUTC, StopTimeUTC, ' .
+			'StartTimeEpoch, StopTimeEpoch, SubmitHost, ' .
+			'MemoryReal, MemoryVirtual, Processed, ' .
+			'EventDate, EventTime) ' .
+			'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? );')
+	  or die $dbh->errstr;
+    $dbh->{HandleError} = sub { 
+      warn "SQL failed with @_\n";
+      printlog ("SQL failed with @_\nExiting.\n");
+      warn "Exiting.\n";
+      die "Exited due to SQL error @_.\n";
+    };
+
+    printlog("Slurm processing starts.\n") if $verbose;
+
+    while (<$log>) {
+      my %this_tags = ();
+      my ($result, $match, $tags) = $parser->parse($_);
+      $matches++ if $match;
+      $matches{$match} = defined $matches{$match} ? $matches{$match} + 1 : 1;
+      printlog ("Slurm NOTAGS:\n$_\n" . Dumper($result)) if ($match and not scalar @$tags);
+      printlog ("Slurm DAMN: no match!\n$_\n") and $fails++ unless $match;
+      foreach (@$tags) {
+	if (exists $tags{$_}) { $tags{$_}++ } else { $tags{$_} = 1} ;
+	$this_tags{$_} = 1;
+      }
+
+      # check if this slurm match is suitable
+      if ( $match eq 'job'
+	   and exists $this_tags{finished}
+	   and not exists $this_tags{failed} ) {
+      # set up slurm data
+      # insert
+      }
+
+      next LOG;
+    }
+
     if ($rewind and not $reparse) {
       seek($log, $rewind, 0);
       printlog ("Rewinding $conf->{confs}{$logconf}[0]{logfile} to $rewind.\n");
