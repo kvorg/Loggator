@@ -1,0 +1,163 @@
+- logfile: /afs/f9.ijs.si/home/jona/Projects/NG-logmonitor/var/gridftpd.log
+  patterns:
+    - standard:
+        re:
+          - date: '(\w{3} \s+ \d{2}) \s+'
+          - time: '(\d{2}:\d{2}:\d{2}) \s+'
+          - _idopen: '(:? ()'
+          - id: '\[( \d+ ) \] \s+'
+          - _idclose: '() )?'
+          - message: '(.*) $'
+        tags:
+          start-connection:
+            message: '^New connection'
+          accept-from:
+            message: '^Accepted connection from'
+          response-ready:
+            message: '^response: 220 Server ready'
+          user-dn:
+            message: '^User subject'
+          connection-encrypt:
+            message: '^Encrypt:'
+          proxy-location:
+            message: '^Proxy stored at '
+          local-id:
+            message: '^Mapped to local id: (\d+)$'
+          local-groupid:
+            message: '^Mapped to local group id: (\d+)'
+          local-groupname:
+            message: '^Mapped to local group name: (.+)'
+          local-home:
+            message: "^Mapped user's home: "
+          job-plugin:
+            message: '^Registering directory:jobs with plugin:'
+          mountpoint:
+            message: '^Mount point'
+          response-auth-ok:
+            message: '^response: 235 Authentication successful'
+          request-authtype:
+            message: '^Command DCAU: (.*)'
+          response-ok-authtype:
+            message: '^response: 200 Authentication type accepted'
+          request-usermapping:
+            message: '^Command USER'
+          error-unsupportedcommand:
+            message: '^response: 500'
+          request-helpmessage:
+            message: '^Raw command: SITE HELP'
+          error-helpmessage:
+            message: '^response: 211'
+          error-send-failed:
+            message: '^Send response failed'
+          error-auth-failed:
+            message: '^response: 535 Authentication failed'
+          error-auth-failure:
+            message: '^Authentication failure'
+          error-auth-syntaxerror:
+            message: 'Command not part of authentication process$'
+          error-file-not-allowed:
+            message: '^response: [45]50 Not allowed to this job.'
+          error-file-not-awailable:
+            message: '^response: 550 File unavailable.'
+          request-mode-binary:
+            message: '^Command TYPE I'
+          response-ok-type:
+            message: '^response: 200 Type accepted'
+          request-buffersize:
+            message: '^Command PBZS:'
+          response-ok-buffersize:
+            message: '^response: 200 Accepted buffer size'
+          accept-buffersize:
+            message: '^Setting pbsz to (\d*)'
+          request-passivemode:
+            message: '^Command PASV/SPAS'
+          response-ok-passivemode:
+            message: '^response: 227 Entering Passive Mode \(([0-9,]+)\)'
+          request-transfer-retrieve:
+            message: '^Command RETR (.*)$'
+          request-transfer-store:
+            message: '^Command STOR (.*)$'
+          file-open:
+            message: '^plugin: open: (.*)$'
+          response-opening-connection:
+            message: '^response: 150 Opening connection.'
+          starting-datacallback-retrieve:
+            message: '^data_connect_retrieve_callback$'
+          starting-datacallback-store:
+            message: '^data_connect_store_callback$'
+          start-dataconnection-retrieve:
+            message: '^Data channel connected \(retrieve\)'
+          start-dataconnection-store:
+            message: '^Data channel connected \(store\)'
+          start-dataconnection-list:
+            message: '^Data channel connected \(list\)'
+          buffers-allocated:
+            message: '^Allocated (\d+) buffers (\d+) bytes each.'
+          datacallback-status:
+            message: '^data_connect_retrieve_callback: (.*)$'
+          end-dataconnection-retrieve:
+            message: '^Closing channel \(retrieve\)'
+          end-dataconnection-store:
+            message: '^Closing channel \(store\)'
+          end-dataconnection-list:
+            message: '^Closing channel \(list\)'
+          response-transfer-completed:
+            message: '^response: 226'
+          response-filetransfer-completed:
+            message: '^response: 226 Requested file transfer completed'
+          response-listtransfer-completed:
+            message: '^response: 226 Transfer completed'
+          report-time-network:
+            message: '^Time spent waiting for network: (.*)$'
+          report-time-disk:
+            message: '^Time spent waiting for disc: (.*)$'
+          request-mlsd:
+            message: '^Command MLSD (.*)$'
+          response-ok-listconnection:
+            message: '^response: 150 Opening connection for list.'
+          request-cwd:
+            message: '^Command CWD (.*)$'
+          response-cwd:
+            message: '^response: 250 "(.*)" is current directory'
+          request-delete:
+            message: '^Command DELE (.*)$'
+          response-ok-delete:
+            message: '^response: 250 File deleted.'
+          request-rmdir:
+            message: '^Command RMD (.*)$'
+          response-ok-rmdir:
+            message: '^response: 250 Directory deleted.'
+          end-controlconnection:
+            message: '^Control connection \(probably\) closed'
+          eof:
+            message: '^an end-of-file was reached'
+          ending-start:
+            message: '^make_abort: start'
+          ending-destructor:
+            message: '^Destructor with (.*)$'
+          user-local:
+            message: '^Initially mapped to local user'
+          job-new:
+            message: '^Accepting submission of new job:'
+          request-quit:
+            message: '^Command QUIT'
+          response-ok-quit:
+            message: '^response: 221 Quiting.'
+          closing-connection:
+            message: '^Closing connection'
+          end-connection:
+            message: '^Closed connection'
+          accept-end-connection:
+            message: '^Accept exited'
+          report-num-connections:
+            message: '^Have connections: (\d+), max: (\d+)'
+          job-data:
+            message: '^(:? RELATION|BOOLEAN):'
+          job-data-relation-yes:
+            message: '^RELATION: (\w+) = (.*)$'
+          job-data-relation-no:
+            message: '^RELATION: (\w+) != (.*)$'
+          job-data-boolean:
+            message: '^BOOLEAN: (\w+)$'
+          skipped:
+            message: '^response: 230'
