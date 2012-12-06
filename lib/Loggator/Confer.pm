@@ -46,7 +46,7 @@ sub receive {
       #print ">>$confid<<\n";
       $self->{$confid} = $confdata;
   } else {
-      $self->printlog("Overwriting existing configuration for $confid.\n") 
+      $self->printlog("Overwriting existing configuration for $confid.\n")
 	  if exists $self->{confs}{$confid};
       $self->{confs}{$confid} = $confdata;
   }
@@ -79,6 +79,7 @@ sub printlog {
     }  
     my $log = $self->{logfile} ;
     my $dt = DateTime->now();
+    # looks buggy, should be printing to $log?
     print  $dt->ymd() . " " . $dt->hms() . " ", @_ ;
 }
 
