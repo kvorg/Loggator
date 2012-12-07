@@ -1,4 +1,4 @@
-- logcommand: 'sacct -a -s CA,CD,F,TO -S $from -E $to --format JobID,Submit,JobName,AssocID,Account,User,Group,Cluster,Cputime,ncpus,nnodes,nodelist,Elapsed,TotalCPU,MaxVMSize,MaxRSS,Eligible,Start,End,State,ExitCode'
+- logcommand: 'sacct -p -a -s CA,CD,F,TO -S $from -E $to --format JobID,Submit,JobName,AssocID,Account,User,Group,Cluster,Cputime,ncpus,nnodes,nodelist,Elapsed,TotalCPU,MaxVMSize,MaxRSS,Eligible,Start,End,State,ExitCode'
   patterns:
     - header:
         re:
