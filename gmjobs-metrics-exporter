@@ -269,7 +269,7 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
 	  # we don't have a machine id for the eventid
 	  my $eventdate = parse_time($result->{'end_timestamp'})->ymd;
 	  my $eventtime = parse_time($result->{'end_timestamp'})->hms;
-	  my $eventid =  "$eventdate $eventtime} $result->{jobid} $result->{cluster}";
+	  my $eventid =  "$eventdate $eventtime $result->{jobid} $result->{cluster}";
 
 	  my @insert = (
 			$eventid, $result->{cluster}, $result->{user}, $result->{group},
