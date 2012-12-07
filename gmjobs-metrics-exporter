@@ -190,7 +190,8 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
   if ( not $conf->{confs}{$logconf}[0]{logfile} and $conf->{confs}{$logconf}[0]{logcommand}) {
     # we pretend to be generic, but this is really slurm - perhaps we need hooks in logs?
     my $dt = DateTime->today;
-    my ($from, $to) = ($dt->subtract(days => 1)->ymd, $dt->ymd); #From yesterday to today
+    my $yd = $dt->clone->subtract(days => 1);
+    my ($from, $to) = ($yd->ymd, $dt->ymd); #From yesterday to today (should use a state file)
     my $cmd = "$conf->{confs}{$logconf}[0]{logcommand}";
     my $tmpfile = mktemp('gmjobs_' . $logconf . '_tmp_XXXXX');
     $cmd =~ s/\$from/$from/g;     $cmd =~ s/\$to/$to/g;
@@ -250,34 +251,34 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
 	if ( $match and $match eq 'job'
 	     and exists $this_tags{finished}
 	     and not exists $this_tags{failed} ) {
-	  if ( defined $result->{user}
-	       and defined $result->{cluster}
+	  if ( defined $result->{cluster}
 	       and defined $result->{cputime}
-	       and defined $result->{'stop_timestamp'} ) {
-	    printlog ("Parsed slurm job: result->{jobid}, $result->{user}, $result->{'start_timestamp'}, $result->{'stop_timestamp'}, $nocommitmsg\n") if $verbose;
+	       and defined $result->{'end_timestamp'} ) {
+	    $result->{user} |= 'NONE';
+	    printlog ("Parsed slurm job: result->{jobid}, $result->{user}, $result->{'start_timestamp'}, $result->{'end_timestamp'}, $nocommitmsg\n") if $verbose;
 
 	  } else {
 	    printlog ("SKIPPING STRANGE SLURM OBJECT:\n$_\n" . Dumper(\$result, \%this_tags) . "\n") ;
 	    next;
 	  }
 	  # set up slurm data
-	  # we have data in $result->{}:
+	  # we have this in $result->{}:
 	  #  jobid submit_timestamp jobname associd account user group cluster cputime
 	  #  no_of_cpus no_of_nodes node_list walltime used_cput max_vmem max_rss
 	  #  eligible_timestamp start_timestamp end_timestamp status exit_status
 
 	  # we don't have a machine id for the eventid
-	  my $eventdate = parse_time($result->{'stop_timestamp'})->ymd;
-	  my $eventtime = parse_time($result->{'stop_timestamp'})->hms;
+	  my $eventdate = parse_time($result->{'end_timestamp'})->ymd;
+	  my $eventtime = parse_time($result->{'end_timestamp'})->hms;
 	  my $eventid =  "$eventdate $result->{time} $result->{jobid} $result->{cluster}";
 
 	  my @insert = (
 			$eventid, $result->{cluster}, $result->{user}, $result->{group},
 			$result->{walltime}, $result->{cputime},
 			seconds($result->{walltime}), seconds($result->{cputime}),
-			$result->{'start_timestamp'}, $result->{'stop_timestamp'},
-			time_utc($result->{'start_timestamp'}), time_utc($result->{'stop_timestamp'}),
-			time_epoch($result->{'start_timestamp'}), time_epoch($result->{'stop_timestamp'}),
+			$result->{'start_timestamp'}, $result->{'end_timestamp'},
+			time_utc($result->{'start_timestamp'}), time_utc($result->{'end_timestamp'}),
+			time_epoch($result->{'start_timestamp'}), time_epoch($result->{'end_timestamp'}),
 			$batchname,
 			$result->{max_rss}, $result->{max_vmem},
 			0, #processed
@@ -286,18 +287,23 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
 
 	  # can we at least check
 	  if ($hostname and $nocommit) {
+	    printlog("Would commit to $hostname: " . join (', ', @insert) . "\n");
 	    my $ref = $dbh->selectrow_hashref("SELECT * FROM EventRecords WHERE EventID = '$eventid' ;");
 	    if ( $ref ) {
 	      printlog ("Skipping existing slurm job $eventid.\n") ;
 	      $skipped++ ;
+	    } else {
+	      print $undofile "DELETE FROM EventRecords WHERE EventID='$eventid';\n";
+	      $posted++;
 	    }
 	  } elsif ($nocommit) {
+	    printlog("Would commit: " . join (', ', @insert) . "\n");
 	    $posted++;
 	    if ($undofile) {
 	      print $undofile "DELETE FROM EventRecords WHERE EventID='$eventid';\n";
 	    }
 	  } else { # commit, really
-	    printlog("Trying to commit:\n" . join(', ', @insert) . "\n");
+	    printlog("Commiting: " . join (', ', @insert) . "\n");
 	    my $insert =
 	      $insEventRecords->execute(@insert);
 	    die $dbh->errstr unless $insert;
@@ -312,6 +318,7 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
 	    }
 	  }
 	}
+	printlog("Apparently not a match.\n");
       } # slurm log ended
       printlog ("\t... done. Slurm report:\n");
       $startfrom = DateTime->now() unless defined $startfrom ; #if nothing happened
