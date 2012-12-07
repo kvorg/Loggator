@@ -19,6 +19,7 @@
 # fix local time in logs etc
 # make rewind less hackish and per log
 # time to trasition and refactor?
+# for slurm, parse /etc/slurm/slurm.conf to get the control machine
 
 #Remember:
 # GkRecords <- globus gatekeeper logs - obsoleted
@@ -141,14 +142,9 @@ Queuename: $queuename, Batchname $batchname\n") if $verbose;
 my $prevpos ;
 my $lastpos ;
 my $previd ;
-
-my $skipped = 0 ;
-my $posted = 0 ;
 my $startfrom ;
 my $dt ;
 my $undofile ;
-my $nocommitmsg = '';
-
 
 printlog ("\u$progname v $version starting.\n");
 
@@ -184,6 +180,13 @@ unless ($reparse) {
 }
 
 LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
+
+
+  my $skipped = 0 ;
+  my $posted = 0 ;
+  my $nocommitmsg = '';
+
+
   if ( not $conf->{confs}{$logconf}[0]{logfile} and $conf->{confs}{$logconf}[0]{logcommand}) {
     # we pretend to be generic, but this is really slurm - perhaps we need hooks in logs?
     my $dt = DateTime->today;
@@ -198,6 +201,8 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
   if ( open my $log, "<", $conf->{confs}{$logconf}[0]{logfile} )    {
 
     printlog("Parsing [$logconf]: $conf->{confs}{$logconf}[0]{logfile} ...\n");
+    printlog ("Nocommit requested, dryrun (no actual data written to the database or state file).\n") if $nocommit;
+    $nocommitmsg = ' (But no commit actually done.)' if $nocommit;
 
     if ($logconf eq 'slurm.log') {
       printlog("Triggered slurm workaround.\n");
@@ -208,7 +213,7 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
       my $fails = 0;
       my %tags = ();
 
-      my $insEventRecords 
+      my $insEventRecords
 	= $dbh->prepare('INSERT IGNORE INTO EventRecords (' .
 			'EventID, SiteName, LocalUserID, LocalUserGroup, ' .
 			'WallDuration, CpuDuration, ' . 
@@ -219,34 +224,81 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
 			'EventDate, EventTime) ' .
 			'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? );')
 	  or die $dbh->errstr;
-    $dbh->{HandleError} = sub { 
-      warn "SQL failed with @_\n";
-      printlog ("SQL failed with @_\nExiting.\n");
-      warn "Exiting.\n";
-      die "Exited due to SQL error @_.\n";
-    };
+      $dbh->{HandleError} = sub { 
+	warn "SQL failed with @_\n";
+	printlog ("SQL failed with @_\nExiting.\n");
+	warn "Exiting.\n";
+	die "Exited due to SQL error @_.\n";
+      };
 
-    printlog("Slurm processing starts.\n") if $verbose;
+      printlog("Slurm processing starts.\n") if $verbose;
 
-    while (<$log>) {
-      my %this_tags = ();
-      my ($result, $match, $tags) = $parser->parse($_);
-      $matches++ if $match;
-      $matches{$match} = defined $matches{$match} ? $matches{$match} + 1 : 1;
-      printlog ("Slurm NOTAGS:\n$_\n" . Dumper($result)) if ($match and not scalar @$tags);
-      printlog ("Slurm DAMN: no match!\n$_\n") and $fails++ unless $match;
-      foreach (@$tags) {
-	if (exists $tags{$_}) { $tags{$_}++ } else { $tags{$_} = 1} ;
-	$this_tags{$_} = 1;
-      }
+      while (<$log>) {
+	my %this_tags = ();
+	my ($result, $match, $tags) = $parser->parse($_);
+	$matches++ if $match;
+	$matches{$match} = defined $matches{$match} ? $matches{$match} + 1 : 1;
+	printlog ("Slurm NOTAGS:\n$_\n" . Dumper($result)) if ($match and not scalar @$tags);
+	printlog ("Slurm DAMN: no match!\n$_\n") and $fails++ unless $match;
+	foreach (@$tags) {
+	  if (exists $tags{$_}) { $tags{$_}++ } else { $tags{$_} = 1} ;
+	  $this_tags{$_} = 1;
+	}
 
-      # check if this slurm match is suitable
-      if ( $match eq 'job'
-	   and exists $this_tags{finished}
-	   and not exists $this_tags{failed} ) {
-      # set up slurm data
-      # insert
-      }
+	# check if this slurm match is suitable
+	if ( $match eq 'job'
+	     and exists $this_tags{finished}
+	     and not exists $this_tags{failed} ) {
+	  if ( defined $result->{user}
+	       and defined $result->{cluster}
+	       and defined $result->{cputime}
+	       and defined $result->{'stop.timestamp'} ) {
+	    printlog ("Parsed slurm job: result->{jobid}, $result->{user}, $result->{'start.timestamp'}, $result->{'stop.timestamp'}, $nocommitmsg\n") if $verbose;
+
+	  } else {
+	    printlog ("SKIPPING STRANGE SLURM OBJECT:\n$_\n" . Dumper(\$result, \%this_tags) . "\n") ;
+	    next;
+	  }
+	  # set up slurm data
+	  # we have data in $result->{}:
+	  #  jobid submit.timestamp jobname associd account user group cluster cputime
+	  #  no_of_cpus no_of_nodes node_list walltime used_cput max_vmem max_rss
+	  #  eligible.timestamp start.timestamp end.timestamp status exit.status
+
+	  # we don't have a machine id for the eventid
+	  my $eventdate = parse_time($result->{'stop.timestamp'})->ymd;
+	  my $eventtime = parse_time($result->{'stop.timestamp'})->hms;
+	  my $eventid =  "$eventdate $result->{time} $result->{jobid} $result->{cluster}";
+
+	  # can we at least check
+	  if ($hostname and $nocommit) {
+	    my $ref = $dbh->selectrow_hashref("SELECT * FROM EventRecords WHERE EventID = '$eventid' ;");
+	    if ( $ref ) {
+	      printlog ("Skipping existing $eventid.\n") ;
+	      $skipped++ ;
+	    }
+	  } elsif ($nocommit) {
+	      $posted++;
+	      if ($undofile) {
+		print $undofile "DELETE FROM EventRecords WHERE EventID='$eventid';\n";
+	      }
+
+	  } else { # commit, really
+	  my $insert =
+	    $insEventRecords->execute($eventid, $result->{cluster}, $result->{user}, $result->{group},
+				      $result->{walltime}, $result->{cputime},
+				      seconds($result->{walltime}), seconds($result->{cputime}),
+				      $result->{'start.timestamp'}, $result->{'stop.timestamp'},
+				      time_utc($result->{'start.timestamp'}), time_utc($result->{'stop.timestamp'}),
+				      time_epoch($result->{'start.timestamp'}), time_epoch($result->{'stop.timestamp'}),
+				      $batchname,
+				      $result->{max_rss}, $result->{max_vmem},
+				      0, #processed
+				      $eventdate, $eventtime) ;
+	  die $dbh->errstr unless $insert;
+	}
+	}
+      } # slurm log ended
 
       next LOG;
     }
@@ -267,9 +319,6 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
 	last;
       }
     }
-
-    printlog ("Nocommit requested, dryrun (no actual data written to the database or state file).\n") if $nocommit;
-    $nocommitmsg = ' (But no commit actually done.)' if $nocommit;
 
     my $parser = Loggator::Parser->new( $conf->{confs}{$logconf}[0]{patterns} );
     my $matches = 0;
@@ -458,6 +507,67 @@ sub is {
   return $_[0] ?  $_[0] : '' ;
 }
 
+sub seconds {
+  my @t = split(':', shift);
+  return DateTime::Duration->new(hours=>$t[0], minutes=>$t[1], seconds=>$t[2])->seconds;
+}
+
+# handle times for RFC3339-like with no nanoseconds and possibly no timezone 
+# 2012-10-01T12:07:47
+# 2012-10-01T12:07:47Z+03:00
+
+sub parse_time {
+  my $ts = shift;
+  $ts =~ m{(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(:?Z(:?([+-]?\d{2}:\d{2}))?)?}x;
+  my $tz = 'UTC';
+  $tz = "$7" if $7;
+  return DateTime->new(
+      year       => $1,
+      month      => $2,
+      day        => $3,
+      hour       => $4,
+      minute     => $5,
+      second     => $6,
+      time_zone  => $tz,
+   );
+}
+
+#function stolen from package DateTime::Format::RFC3339 by Eric Brine
+sub format_datetime {
+   my $dt = shift;
+
+   my $tz;
+   if ($dt->time_zone()->is_utc()) {
+      $tz = 'Z';
+   } else {
+      my $secs  = $dt->offset();
+      my $sign = $secs < 0 ? '-' : '+';  $secs = abs($secs);
+      my $mins  = int($secs / 60);       $secs %= 60;
+      my $hours = int($mins / 60);       $mins %= 60;
+      if ($secs) {
+         ( $dt = $dt->clone() )
+            ->set_time_zone('UTC');
+         $tz = 'Z';
+      } else {
+         $tz = sprintf('%s%02d:%02d', $sign, $hours, $mins);
+      }
+   }
+
+   return
+      $dt->strftime(
+         ($dt->nanosecond()
+            ? '%Y-%m-%dT%H:%M:%S.%9N'
+            : '%Y-%m-%dT%H:%M:%S'
+         )
+      ).$tz;
+}
+
+sub time_utc {
+  return format_datetime(parse_time(shift)->set_time_zone('UTC'));
+}
+sub time_epoch {
+  return parse_time(shift)->epoch;
+}
 
 sub usage {
   print <<"FNORD" ;
