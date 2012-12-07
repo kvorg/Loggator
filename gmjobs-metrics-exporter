@@ -192,8 +192,9 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
     my $dt = DateTime->today;
     my ($from, $to) = ($dt->subtract(days => 1)->ymd, $dt->ymd); #From yesterday to today
     my $cmd = "$conf->{confs}{$logconf}[0]{logcommand}";
-    my $tmpfile = mktemp('/tmp', 'gmjobs_$logconf_tmp_XXXXX');
-    eval "\$cmd = $cmd . ' > \$tmpfile'"; #eval perl vars in $cmd?
+    my $tmpfile = mktemp('gmjobs_' . $logconf . '_tmp_XXXXX');
+    $cmd =~ s/\$from/$from/g;     $cmd =~ s/\$to/$to/g;
+    $cmd .= " > $tmpfile";
     printlog("Getting log data for [$logconf]: $cmd ...\n");
     system $cmd or printlog("  $cmd failed:\n $?") ;
     $conf->{confs}{$logconf}[0]{logfile} = $tmpfile;
@@ -252,8 +253,8 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
 	  if ( defined $result->{user}
 	       and defined $result->{cluster}
 	       and defined $result->{cputime}
-	       and defined $result->{'stop.timestamp'} ) {
-	    printlog ("Parsed slurm job: result->{jobid}, $result->{user}, $result->{'start.timestamp'}, $result->{'stop.timestamp'}, $nocommitmsg\n") if $verbose;
+	       and defined $result->{'stop_timestamp'} ) {
+	    printlog ("Parsed slurm job: result->{jobid}, $result->{user}, $result->{'start_timestamp'}, $result->{'stop_timestamp'}, $nocommitmsg\n") if $verbose;
 
 	  } else {
 	    printlog ("SKIPPING STRANGE SLURM OBJECT:\n$_\n" . Dumper(\$result, \%this_tags) . "\n") ;
@@ -261,13 +262,13 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
 	  }
 	  # set up slurm data
 	  # we have data in $result->{}:
-	  #  jobid submit.timestamp jobname associd account user group cluster cputime
+	  #  jobid submit_timestamp jobname associd account user group cluster cputime
 	  #  no_of_cpus no_of_nodes node_list walltime used_cput max_vmem max_rss
-	  #  eligible.timestamp start.timestamp end.timestamp status exit.status
+	  #  eligible_timestamp start_timestamp end_timestamp status exit_status
 
 	  # we don't have a machine id for the eventid
-	  my $eventdate = parse_time($result->{'stop.timestamp'})->ymd;
-	  my $eventtime = parse_time($result->{'stop.timestamp'})->hms;
+	  my $eventdate = parse_time($result->{'stop_timestamp'})->ymd;
+	  my $eventtime = parse_time($result->{'stop_timestamp'})->hms;
 	  my $eventid =  "$eventdate $result->{time} $result->{jobid} $result->{cluster}";
 
 	  # can we at least check
@@ -287,9 +288,9 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
 	      $insEventRecords->execute($eventid, $result->{cluster}, $result->{user}, $result->{group},
 					$result->{walltime}, $result->{cputime},
 					seconds($result->{walltime}), seconds($result->{cputime}),
-					$result->{'start.timestamp'}, $result->{'stop.timestamp'},
-					time_utc($result->{'start.timestamp'}), time_utc($result->{'stop.timestamp'}),
-					time_epoch($result->{'start.timestamp'}), time_epoch($result->{'stop.timestamp'}),
+					$result->{'start_timestamp'}, $result->{'stop_timestamp'},
+					time_utc($result->{'start_timestamp'}), time_utc($result->{'stop_timestamp'}),
+					time_epoch($result->{'start_timestamp'}), time_epoch($result->{'stop_timestamp'}),
 					$batchname,
 					$result->{max_rss}, $result->{max_vmem},
 					0, #processed
