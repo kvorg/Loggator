@@ -535,8 +535,17 @@ sub is {
 }
 
 sub seconds {
-  my @t = split(':', shift);
-  return DateTime::Duration->new(hours=>$t[0], minutes=>$t[1], seconds=>$t[2])->seconds;
+  my $t = shift;
+  my $days = 0;
+  $t =~ m{^(\d+)-};
+  $days = $1 and $t =~ s{^(\d+)-(.*)$}{$2} if $1;
+  my @t = split(':', $t);
+  return DateTime::Duration->new(
+				 days => $days,
+				 hours=>$t[0],
+				 minutes=>$t[1],
+				 seconds=>$t[2]
+				)->seconds;
 }
 
 # handle times for RFC3339-like with no nanoseconds and possibly no timezone 
