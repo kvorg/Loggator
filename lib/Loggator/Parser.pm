@@ -33,7 +33,8 @@ sub init {
     my ( $pname ) = keys %{$_};
     push @{$self->{res}}, $pname;  # save pattern order
     $self->{re}{$pname} = buildre( \@{$_->{$pname}{re}} , '$self->{results}');
-    $self->{tags}{$pname} = { %{$_->{$pname}{tags}} };
+    $self->{tags}{$pname} = { %{$_->{$pname}{tags}} }
+      if $_->{$pname}{tags} and ref $_->{$pname}{tags} eq 'HASH';
   }
   #use Data::Dumper;
   #print Dumper ($self);
