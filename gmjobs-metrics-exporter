@@ -253,7 +253,7 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
 	  if ( defined $result->{cluster}
 	       and defined $result->{cputime}
 	       and defined $result->{'end_timestamp'} ) {
-	    $result->{user} |= 'NONE';
+	    $result->{user} ||= 'NONE';
 	    printlog ("Parsed slurm job: result->{jobid}, $result->{user}, $result->{'start_timestamp'}, $result->{'end_timestamp'}, $nocommitmsg\n") if $verbose;
 
 	  } else {
@@ -317,7 +317,6 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
 	    }
 	  }
 	}
-printlog("Apparently not a match.\n");
       } # slurm log ended
       printlog ("\t... done. Slurm report:\n");
       $startfrom = DateTime->now() unless defined $startfrom ; #if nothing happened
@@ -325,6 +324,16 @@ printlog("Apparently not a match.\n");
       printlog ("+ posted $posted, skipped $skipped from " .
 		$startfrom->ymd()  . ' ' . $startfrom->hms() . ' to ',
 		$dt->ymd()  . ' ' . $dt->hms() . "\n");
+    printlog ("+ Parser matches: $matches\t Fails: $fails (" .
+      sprintf ("%4.2f", ( $fails + $matches ? ( $fails / ($fails + $matches) * 100) : 0) ). " %)\n") ;
+    printlog ("+ Matched patterns:\n");
+    foreach (keys %matches) {
+      printlog ('+' . sprintf ("%32s:\t%9d (%04.2f %%)\n", $_, $matches{$_}, ($matches{$_} / ($fails + $matches) * 100))) ;
+    }
+    printlog ("+ Matched tags:\n");
+    foreach (keys %tags) {
+      printlog ('+' . sprintf ("%32s:\t%9d (%04.2f %%)\n", $_, $tags{$_}, ($tags{$_} / ($fails + $matches) * 100)) ) ;
+    }
 
       next LOG;
     }
@@ -535,16 +544,12 @@ sub is {
 }
 
 sub seconds {
-  my $t = shift; warn ">> $t\n";
+  my $t = shift;
   my $days = 0;
-  $t =~ m{^(\d+)-};
-  $days = $1 and $t =~ s{^(\d+)-(.*)$}{$2} if $1;
+  if ($t =~ m{^(\d+)-}) {
+    $days = $1 and $t =~ s{^(\d+)-(.*)$}{$2} if $1;
+  }
   my @t = reverse split(':', $t);
-  warn Dumper( { days =>   $days,
-		 hours=>   $t[2] || 0,
-		 minutes=> $t[1] || 0,
-		 seconds=> $t[0] || 0,
-	       } );
   return (
 	  ($days * 86400) +
 	  (($t[2] || 0) * 3600) +
