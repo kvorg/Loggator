@@ -31,12 +31,18 @@
           - exit_status:      '([^|]*)'
         tags:
           jobend:
-            jobid: '.'
+            status: '.'
+          batch:
+            jobid: '[.]batch'
           atlas_kitvalidation:
             jobname: '^KitValidation-'
-          deletion:
-            status: 'DELETED'
-          failure:
+          deleted:
+            status: 'DELETED|CANCELLED'
+          timedout:
+            status: 'TIMEOUT'
+          failed:
             status: 'FAILED'
+          completed:
+            status: 'COMPLETED'
           exit_non_zero:
             exit_status: '^[^0]+$'
