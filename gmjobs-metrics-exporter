@@ -274,31 +274,45 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
 	  if ($hostname and $nocommit) {
 	    my $ref = $dbh->selectrow_hashref("SELECT * FROM EventRecords WHERE EventID = '$eventid' ;");
 	    if ( $ref ) {
-	      printlog ("Skipping existing $eventid.\n") ;
+	      printlog ("Skipping existing slurm job $eventid.\n") ;
 	      $skipped++ ;
 	    }
 	  } elsif ($nocommit) {
-	      $posted++;
-	      if ($undofile) {
-		print $undofile "DELETE FROM EventRecords WHERE EventID='$eventid';\n";
-	      }
-
+	    $posted++;
+	    if ($undofile) {
+	      print $undofile "DELETE FROM EventRecords WHERE EventID='$eventid';\n";
+	    }
 	  } else { # commit, really
-	  my $insert =
-	    $insEventRecords->execute($eventid, $result->{cluster}, $result->{user}, $result->{group},
-				      $result->{walltime}, $result->{cputime},
-				      seconds($result->{walltime}), seconds($result->{cputime}),
-				      $result->{'start.timestamp'}, $result->{'stop.timestamp'},
-				      time_utc($result->{'start.timestamp'}), time_utc($result->{'stop.timestamp'}),
-				      time_epoch($result->{'start.timestamp'}), time_epoch($result->{'stop.timestamp'}),
-				      $batchname,
-				      $result->{max_rss}, $result->{max_vmem},
-				      0, #processed
-				      $eventdate, $eventtime) ;
-	  die $dbh->errstr unless $insert;
-	}
+	    my $insert =
+	      $insEventRecords->execute($eventid, $result->{cluster}, $result->{user}, $result->{group},
+					$result->{walltime}, $result->{cputime},
+					seconds($result->{walltime}), seconds($result->{cputime}),
+					$result->{'start.timestamp'}, $result->{'stop.timestamp'},
+					time_utc($result->{'start.timestamp'}), time_utc($result->{'stop.timestamp'}),
+					time_epoch($result->{'start.timestamp'}), time_epoch($result->{'stop.timestamp'}),
+					$batchname,
+					$result->{max_rss}, $result->{max_vmem},
+					0, #processed
+					$eventdate, $eventtime) ;
+	    die $dbh->errstr unless $insert;
+	    if ($insert == 0) {
+	      printlog ("Skipping existing slurm job $eventid.\n") ;
+	      $skipped++ ;
+	    } else {
+	      $posted++
+	    }
+	    if ($undofile) {
+	      print $undofile "DELETE FROM EventRecords WHERE EventID='$eventid';\n";
+	    }
+	  }
 	}
       } # slurm log ended
+      printlog ("\t... done. Slurm report:\n");
+      $startfrom = DateTime->now() unless defined $startfrom ; #if nothing happened
+      $dt = DateTime->now() unless defined $dt ;               #if nothing happened
+      printlog ("+ posted $posted, skipped $skipped from " .
+		$startfrom->ymd()  . ' ' . $startfrom->hms() . ' to ',
+		$dt->ymd()  . ' ' . $dt->hms() . "\n");
 
       next LOG;
     }
