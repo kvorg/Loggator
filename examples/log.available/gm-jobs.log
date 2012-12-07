@@ -13,7 +13,7 @@
           - ownerDN: ',\s+ owner: \s+ "([^"]*)"'
           - lrmstype: ',\s+ lrms: \s+ ([^,]*)'
           - queuename: '(:? , \s+ queue: \s+ ([^,]*) '
-          - lrmsid: ')?(:? ,\s lrmsid: \s+ (\d+\.\w+) '
+          - lrmsid: ')?(:? ,\s lrmsid: \s+ (\w+) '
           - _jobclose: )?() )?
           - failure: '(:? (:? (:? ,\s+)? ,\s* failure: \s+ \"(.*)\" \s* $ '
           - _close: ')? | (?:\s*$ ) ) () '
