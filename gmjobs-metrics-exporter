@@ -44,7 +44,7 @@ use Loggator::Parser ;
 
 #setup
 
-END { savestate(); }
+END { savestate(); 1; }
 
 use vars qw($state);
 my $version = '0.11';
@@ -238,7 +238,7 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
 	my %this_tags = ();
 	my ($result, $match, $tags) = $parser->parse($_);
 	$matches++ if $match;
-	$matches{$match} = defined $matches{$match} ? $matches{$match} + 1 : 1;
+	$matches{$match} = defined $matches{$match} ? $matches{$match} + 1 : 1 if $match;
 	printlog ("Slurm NOTAGS:\n$_\n" . Dumper($result)) if ($match and not scalar @$tags);
 	printlog ("Slurm DAMN: no match!\n$_\n") and $fails++ unless $match;
 	foreach (@$tags) {
@@ -247,7 +247,7 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
 	}
 
 	# check if this slurm match is suitable
-	if ( $match eq 'job'
+	if ( $match and $match eq 'job'
 	     and exists $this_tags{finished}
 	     and not exists $this_tags{failed} ) {
 	  if ( defined $result->{user}
@@ -271,6 +271,19 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
 	  my $eventtime = parse_time($result->{'stop_timestamp'})->hms;
 	  my $eventid =  "$eventdate $result->{time} $result->{jobid} $result->{cluster}";
 
+	  my @insert = (
+			$eventid, $result->{cluster}, $result->{user}, $result->{group},
+			$result->{walltime}, $result->{cputime},
+			seconds($result->{walltime}), seconds($result->{cputime}),
+			$result->{'start_timestamp'}, $result->{'stop_timestamp'},
+			time_utc($result->{'start_timestamp'}), time_utc($result->{'stop_timestamp'}),
+			time_epoch($result->{'start_timestamp'}), time_epoch($result->{'stop_timestamp'}),
+			$batchname,
+			$result->{max_rss}, $result->{max_vmem},
+			0, #processed
+			$eventdate, $eventtime
+		       );
+
 	  # can we at least check
 	  if ($hostname and $nocommit) {
 	    my $ref = $dbh->selectrow_hashref("SELECT * FROM EventRecords WHERE EventID = '$eventid' ;");
@@ -284,17 +297,9 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
 	      print $undofile "DELETE FROM EventRecords WHERE EventID='$eventid';\n";
 	    }
 	  } else { # commit, really
+	    printlog("Trying to commit:\n" . join(', ', @insert) . "\n");
 	    my $insert =
-	      $insEventRecords->execute($eventid, $result->{cluster}, $result->{user}, $result->{group},
-					$result->{walltime}, $result->{cputime},
-					seconds($result->{walltime}), seconds($result->{cputime}),
-					$result->{'start_timestamp'}, $result->{'stop_timestamp'},
-					time_utc($result->{'start_timestamp'}), time_utc($result->{'stop_timestamp'}),
-					time_epoch($result->{'start_timestamp'}), time_epoch($result->{'stop_timestamp'}),
-					$batchname,
-					$result->{max_rss}, $result->{max_vmem},
-					0, #processed
-					$eventdate, $eventtime) ;
+	      $insEventRecords->execute(@insert);
 	    die $dbh->errstr unless $insert;
 	    if ($insert == 0) {
 	      printlog ("Skipping existing slurm job $eventid.\n") ;
@@ -356,7 +361,7 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
       my %this_tags = ();
       my ($result, $match, $tags) = $parser->parse($_);
       $matches++ if $match;
-      $matches{$match} = defined $matches{$match} ? $matches{$match} + 1 : 1;
+      $matches{$match} = defined $matches{$match} ? $matches{$match} + 1 : 1 if $match;
       printlog ("NOTAGS:\n$_\n" . Dumper($result)) if ($match and not scalar @$tags);
       printlog ("DAMN: no match!\n$_\n") and $fails++ unless $match;
       foreach (@$tags) {
@@ -497,7 +502,8 @@ sub savestate {
   close $state ;
   if (not defined $prevpos or not defined $rewind or $nocommit) {
     printlog ("No state retained. Exiting.");
-    die "No state retained. Exiting.\n";
+    warn "No state retained. Exiting.\n";
+    return undef;
   }
 
   open $state, ">", $statefile
