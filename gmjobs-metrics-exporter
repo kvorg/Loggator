@@ -268,7 +268,7 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
 
           # currently, we compose jobid and jobid.batch until we figure this out
 	  if ($result->{jobid} =~ m{^(\d+)[.]batch$}) {
-	    die "id + id.batch sequence broken in slurm at $1 : $result->{jobid}!\n"
+	    printlog("id + id.batch sequence broken in slurm at $1 : $result->{jobid}, skipped.\n") and next
 	      unless $prevresult->{jobid} eq $1;
 	    foreach my $key (keys $result) {
 	      $result->{$key} = $prevresult->{$key}
@@ -282,9 +282,11 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
 	  # we don't have a machine id for the eventid
 	  my $eventdate = parse_time($result->{'end_timestamp'})->ymd;
 	  my $eventtime = parse_time($result->{'end_timestamp'})->hms;
-	  my $eventid =  "$eventdate $eventtime $result->{jobid} $result->{cluster}";
+	  $result->{cluster} = 'SiGNET' if $result->{cluster} eq 'signet';
+	  my $eventid =  "$eventdate $eventtime $result->{jobid} $batchname $result->{cluster}";
 	  $result->{max_rss}  =~ s/K$//;
 	  $result->{max_vmem} =~ s/K$//;
+
 	  my @insert = (
 			$eventid, $result->{cluster}, $result->{user}, $result->{group},
 			$result->{walltime}, $result->{cputime},
