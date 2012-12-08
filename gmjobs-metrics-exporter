@@ -217,7 +217,8 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
 
       my $insEventRecords
 	= $dbh->prepare('INSERT IGNORE INTO EventRecords (' .
-			'EventID, SiteName, LocalUserID, LocalUserGroup, ' .
+			'EventID, SiteName, JobName, ' .
+			'LocalUserID, LocalUserGroup, ' .
 			'WallDuration, CpuDuration, ' . 
 			'WallDurationSeconds, CpuDurationSeconds, ' .
 			'StartTime, StopTime, StartTimeUTC, StopTimeUTC, ' .
@@ -288,7 +289,8 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
 	  $result->{max_vmem} =~ s/K$//;
 
 	  my @insert = (
-			$eventid, $result->{cluster}, $result->{user}, $result->{group},
+			$eventid, $result->{cluster}, $result->{jobid},
+			$result->{user}, $result->{group},
 			$result->{walltime}, $result->{cputime},
 			seconds($result->{walltime}), seconds($result->{cputime}),
 			$result->{'start_timestamp'}, $result->{'end_timestamp'},
