@@ -225,7 +225,7 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
 			'StartTimeEpoch, StopTimeEpoch, SubmitHost, ' .
 			'MemoryReal, MemoryVirtual, Processed, ' .
 			'EventDate, EventTime) ' .
-			'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? );')
+			'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? );')
 	  or die $dbh->errstr;
       $dbh->{HandleError} = sub { 
 	warn "SQL failed with @_\n";
