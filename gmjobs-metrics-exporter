@@ -15,8 +15,11 @@
 # so it should republish missing things.
 
 # Todo: are all options supported?
+# fix slurm dates in state
+# remove slurm logs and store them in /tmp
+# be conservative with large slurm time spans (check for number of hits, use day spans)
 # Finish transaction size support.
-# fix local time in logs etc
+# fix local time in logs and make logs use real time, not start of script time
 # make rewind less hackish and per log
 # time to trasition and refactor?
 # for slurm, parse /etc/slurm/slurm.conf to get the control machine
@@ -26,6 +29,7 @@
 # EventRecords <- brenta pbs (torque) logs
 # BlahdRecords <-  grid-jobmap* in /opt/edg/var/gatekeeper <- globus submit script
 # MessageRecords <- /var/log/messag
+# consider /var/spool/nordugrid/map/*/pool for uid -> vo mapping
 
 use strict; use warnings;
 
