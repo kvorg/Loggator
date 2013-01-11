@@ -59,6 +59,7 @@ my $logfile = 'gmjobs-metrics-exporter.log' ;
 my $statefile = 'gmjobs-metrics-exporter.state' ;
 my $nocommit = 0;
 my $blahmode = 1;
+my @limit = (); my %limit;
 my $reparse= 0;
 my $verbose = 0;
 my $debug = 0;
@@ -88,6 +89,7 @@ GetOptions ( 'config|c=s'   => \$config,
 	     'reparse|r'    => \$reparse,
 	     'jumpto|j=s'    => \$jumpto,
 	     'blahmode|B'   => \$blahmode,
+	     'limit|L'      => \@limit,
 	     'verbose|v'    => \$verbose,
 	     'debug|d'      => \$debug,
 	     'withundo|u=s' => \$withundo,
@@ -114,6 +116,12 @@ open our $log, ">>", $logfile
 $| = 1, select $_ for select $log; #log to autoflush :-)
 open $state, "<", $statefile
   or warn "Can't open state file $statefile for reading, @!\n" unless $reparse ;
+
+if (scalar @limit) {
+  @limit = map { split /,/, $_ } @limit; # allow comma-separated lists
+  printlog ("Processing limited to the following logs: " . join(', ', @limit) . "\n");
+  %limit = map { $_ => 1 } @limit;       # prepare a hash for easy access
+}
 
 
 # Configuration
@@ -187,6 +195,11 @@ unless ($reparse) {
 
 LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
 
+  # skip all but selected logs with limit
+      printlog ("Skipping log $logconf - not selected with limit\n ("
+		. join(', ', @limit) . ")\n")
+	and next LOG
+	  if (scalar @limit and not $limit{$logconf} ) ;
 
   my $skipped = 0 ;
   my $posted = 0 ;
@@ -689,8 +702,11 @@ Options:
                  expression is found. This can be used when a
                  statefile is not generated after a failure to speed
                  up the system.
- --blahmode  -B  Compatibiliy switch for the new mode (blah table)
+ --blahmode  -B  Obsoleted compatibiliy switch for newer database format.
                  This is now the default, and the old mode is disabled.
+ --limit  -L     Limit the processing only to the stated log file configuration.
+                 Can be used multiple times to process only selected log files.
+                 Alternatively, a comma-separated list can be used.
  --nocommit  -n  Do nothing, just parse the log file and check
                  for duplicates in the database.
  --reparse   -r  Ignore the state file, start from the beginning
