@@ -59,6 +59,7 @@ my $logfile = 'gmjobs-metrics-exporter.log' ;
 my $statefile = 'gmjobs-metrics-exporter.state' ;
 my $nocommit = 0;
 my $blahmode = 1;
+my $from; my $to;
 my @limit = (); my %limit;
 my $reparse= 0;
 my $verbose = 0;
@@ -87,9 +88,11 @@ GetOptions ( 'config|c=s'   => \$config,
              'statefile|s=s'=> \$statefile,
 	     'nocommit|n'   => \$nocommit,
 	     'reparse|r'    => \$reparse,
-	     'jumpto|j=s'    => \$jumpto,
+	     'jumpto|j=s'   => \$jumpto,
 	     'blahmode|B'   => \$blahmode,
-	     'limit|L'      => \@limit,
+	     'limit|L=s'    => \@limit,
+	     'from=s'       => \$from,
+	     'to=s'         => \$to,
 	     'verbose|v'    => \$verbose,
 	     'debug|d'      => \$debug,
 	     'withundo|u=s' => \$withundo,
@@ -223,7 +226,8 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
     } else {
       $yd = $dt->clone->subtract(days => 1);
     }
-    my ($from, $to) = ($yd->ymd, $dt->ymd);
+    # use cmdline, state, computed ... in that order
+    my ($from, $to) = ($from || $yd->ymd, $to || $dt->ymd);
     my $cmd = "$conf->{confs}{$logconf}[0]{logcommand}";
     my $tmpfile = mktemp('gmjobs_' . $logconf . '_tmp_XXXXX');
     $cmd =~ s/\$from/$from/g;     $cmd =~ s/\$to/$to/g;
@@ -712,6 +716,9 @@ Options:
                  for duplicates in the database.
  --reparse   -r  Ignore the state file, start from the beginning
                  of the log.
+ --from --to     For those sources that support it (SLURM), use
+                 the given from and to time parameters to capture logged events
+                 instead of state or computed values (one or both can be specified)
  --verbose   -v  Print info on STDERR while running.
  --debug     -d  Print more info.
  --withundo  -u  Write undo files to specified file.
