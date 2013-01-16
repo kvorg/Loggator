@@ -496,7 +496,7 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
 	      $verbose ?
 		printlog ("Inserting new job: $id, $owner, $before, $after. $nocommitmsg\n") :
 		  printlog ("Inserted: $id. $nocommitmsg\n") ;
-	      my $insert = $insBLAHd->execute($blahid, "$date $result->{time}", $owner, '', $resourceid, $joburi, $jobid, $jobid, $sitename, $before, $after, 0);
+	      my $insert = $insBLAHd->execute($blahid, "$date $result->{time}", $owner, 'NULL', $resourceid, $joburi, $jobid, $jobid, $sitename, $before, $after, 0);
 	      die $dbh->errstr unless $insert;
 	      if ($insert == 0) {
 		printlog ("Skipping existing $blahid.\n") ;
