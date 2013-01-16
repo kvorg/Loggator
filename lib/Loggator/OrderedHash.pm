@@ -40,3 +40,5 @@ sub FETCH {
   defined $key or die "Out of band access";
   $$self->[$key];
 }
+
+1;
