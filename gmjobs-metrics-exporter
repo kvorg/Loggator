@@ -51,7 +51,7 @@ use Loggator::Parser ;
 END { savestate(); 1; }
 
 use vars qw($state);
-my $version = '0.11';
+my $version = '0.12';
 my $progname = $0; $progname =~ s{(.*/)?([^/]+)$}{$2} ;
 
 my $config = 'gmjobs-metrics-exporter.rc' ;
@@ -672,9 +672,9 @@ sub time_epoch {
 
 sub usage {
   print <<"FNORD" ;
-\u$progname: Incrementaly read new items in NG ARC's gm-jobs log
-and post them to the gLite's MySQL data base to be handled
-by apel publisher.
+\u$progname (version $version): Incrementaly read new items in NG
+ARC's gm-jobs log and post them to the gLite's MySQL data base to be
+handled by apel publisher.
 
 \u$progname tries not to repost anything.
 
