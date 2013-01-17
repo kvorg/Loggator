@@ -1,15 +1,16 @@
 =head1 LOGGATOR AND GMJOBS-METRICS-EXPORTER
 
 This package contains gmjobs-metrics-exporter, a script that can parse
-NorduGrid ARC GridManager logs and insert the extracted information in
-a MySQL database in the format understood by APEL. In this way, it can
-be used to post grid accounting data from ARC frontends using the APEL
+NorduGrid ARC GridManager logs (ARC CE) and SLURM batch manager (LRMS)
+and insert the extracted information in a MySQL database in the format
+understood by APEL, the EGI accounting service. In this way, it can be
+used to post grid accounting data from ARC frontends using the APEL
 gLite service.
 
-This package is build on top of C<Loggator>, a project (very much
-work-in-progress) to construct generci log parsers. Only a part of the
-project is needed (and only the needed parts and examples are included
-in default tar archives and installation support).
+This package is build on top of C<Loggator>, a beginning of a generic
+log parsing framework. Eventually, it is hoped the script will be
+replaced with the parsing framework and some hooks called from the
+script.
 
 This package has the following dependecies (all of which are perl
 packages, installable as distribution packages on most distributions:
@@ -41,6 +42,10 @@ To install with the provided Makefile:
 
  make install
 
+Please note that this installs only a default set-up for ARC
+processing. If you also want to use SLURM processing, you have to make
+sure slurm is installed on the machine where the script will run, and
+the C<sacct> command is available.
 
 =head2 CONFIGURATION
 
@@ -103,6 +108,27 @@ possible to use one of the several CPAN solutions, but none has been
 implemented at this point. If you need this feature, contributions are
 welcome.
 
+=head3 SLURM
+
+If you also want to use SLURM processing, you have to make sure slurm
+is installed on the machine where the script will run, and the
+C<sacct> command is available.
+
+Slurm log definition is not installed by default, but is available
+under C<< examples/log.available/slurm.log >>. No customisation should
+be needed. To enable it, simply compy the file into your .rc
+directory. With the default setup, this would be the relevant command:
+
+ cp examples/log.available/slurm.log /opt/gmjobs-metrics-exporter/gmjobs-metrics-exporter.rc
+
+If you have been using this script previously and have only now added
+slurm processin, you might want the script to process old records in
+addition to the ones newer than the state file, which is the default
+procedure. You can use the C<--from> flag to specify a starting
+date. Use the YYYY-MM-DD format, please. You should probalby copy and
+the default parameters from the script you are using to remain
+consistent with the previous runs.
+
 
 =head2 FIRST RUN
 
@@ -141,9 +167,10 @@ Surely many, but among other things:
 
 =item * no logrotate support
 
-=item * no support for user->VO mapping (in progress)
-
-=item * too slow
+=item * no support for user->VO mapping since gmjob.log does not
+include FQAN - but this can be worked around with the use of sensible
+local group names that APEL understands, or setting up APEL with
+suitable mappings
 
 =item * should terminate gracefully on C<SIGHUP>, writing a state-file
 
@@ -155,9 +182,10 @@ Surely many, but among other things:
 =head2 IN ADDITION
 
 Under C<examples/>, you can find parsing configuration files for PBS
-logs and gridftpd logs. While they have absolutely nothing to do, you
-might want to take a look at them and use the Loggator infrastructure
-for a different application. Good luck ;-)
+logs and gridftpd logs. While they have absolutely nothing to do with
+accounting at this point, you might want to take a look at them and
+use the Loggator infrastructure for a different application. Good luck
+;-)
 
 =head2 CREDITS
 
