@@ -1,16 +1,18 @@
-* make CPAN installable
-* make tests
-* steal Mojo::Base
-* make thin DB layer for exports
-* encapsulate:
+* move parsing in Loggator - encapsulate:
 ** one-time parser
 ** one-time command STDOUT parser
-* add hooks
-* encapsulate grid accounting with hooks
+* make state (rewind + date) log-local
+* encapsulate grid accounting with hooks:
+  move buissiness logic into log+tag-based hook callbacks
+* make tests
+* make CPAN installable
+* steal Mojo::Base
+* make thin DB layer for exports
 * package grid accounting as an app
 
 * encapsulate:
 ** logtail
 * develop thin DB layer into DB model
+* make aggregator and extractor models
 * add web interface for context
 * package daemon + web interface as an app
