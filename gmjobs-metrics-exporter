@@ -190,7 +190,7 @@ my $from_state = undef;
 
 unless ($reparse) {
   while (<$state>) {
-    m/^(\S)+\s+\S+\s+(\d+)/ ;
+    m/^(\S+)\s+\S+\s+(\d+)/ ;
     $from_state = $1 ;
     $rewind = $2 ;
   }
