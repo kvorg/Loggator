@@ -1,4 +1,4 @@
-- logfile: /afs/f9.ijs.si/home/jona/Projects/NG-logmonitor/var/gridftpd.log
+- logfile: /var/gridftpd.log
   patterns:
     - standard:
         re:

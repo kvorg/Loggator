@@ -1,4 +1,4 @@
-- logfile: /afs/f9.ijs.si/home/jona/Projects/NG-logmonitor/var/logs/PBS-server_priv-accounting
+- logfile: /var/logs/PBS-server_priv-accounting
   patterns:
     - job:
         re:

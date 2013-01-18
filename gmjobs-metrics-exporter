@@ -28,7 +28,7 @@
 # GkRecords <- globus gatekeeper logs - obsoleted
 # EventRecords <- brenta pbs (torque) logs
 # BlahdRecords <-  grid-jobmap* in /opt/edg/var/gatekeeper <- globus submit script
-# MessageRecords <- /var/log/messag
+# MessageRecords <- /var/log/message
 # consider /var/spool/nordugrid/map/*/pool for uid -> vo mapping
 
 use strict; use warnings;
