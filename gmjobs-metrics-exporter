@@ -307,7 +307,7 @@ LOG: foreach my $logconf ( keys %{$conf->{confs}} ) {
 	  if ($result->{jobid} =~ m{^(\d+)[.]batch$}) {
 	    printlog("id + id.batch sequence broken in slurm at $1 : $result->{jobid}, skipped.\n") and next
 	      unless $prevresult->{jobid} eq $1;
-	    foreach my $key (keys $result) {
+	    foreach my $key (keys %$result) {
 	      $result->{$key} = $prevresult->{$key}
 		unless defined $result->{$key} and not $result->{$key} eq '';
 	    }
